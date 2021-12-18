@@ -1,0 +1,30 @@
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel PropagateWaves
+#pragma kernel AddNewWaves
+
+struct Coord
+{
+    int x;
+    int y;
+};
+
+// Create a RenderTexture with enableRandomWrite flag and set it
+// with cs.SetTexture
+RWTexture2D<float4> TargetTexture;
+ConsumeStructuredBuffer<Coord> NewCoords;
+
+
+
+[numthreads(8, 1, 1)]
+void AddNewWaves(uint3 id : SV_DispatchThreadID)
+{
+    Coord c = NewCoords.Consume();
+    uint2 coord = uint2(c.x, c.y);
+    TargetTexture[coord] = float4(1.0,0.0, 0.0, 1.0);
+}
+
+[numthreads(8, 8, 1)]
+void PropagateWaves(uint3 id : SV_DispatchThreadID)
+{
+    TargetTexture[id.xy] = float4(id.x & id.y, (id.x & 15) / 15.0, (id.y & 15) / 15.0, 0.0);
+}
