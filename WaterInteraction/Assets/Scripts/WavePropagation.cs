@@ -1,129 +1,174 @@
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-
+using UnityEngine.Profiling;
+using UnityEngine.Rendering;
 namespace WaterInteraction
 {
-
-    public struct Coord
+    public struct WaveSegment
     {
-        public Coord(int x, int y)
-        {
-            X = x;
-            Y = y;
-        }
-        public int X;
-        public int Y;
+        public Vector2 Origin;
+
+        public float Strength;
+        public float StrenghtDecay;
+
+        public float Radius;
+        public float Speed;
+
+        public float WaveThickness;
+
+        public float StartAngleRadian;
+        public float AngleSize;
     }
 
     public class WavePropagation : MonoBehaviour
     {
-        // Start is called before the first frame update
+        List<WaveSegment> _Waves = new List<WaveSegment>();
 
-        [SerializeField] ComputeShader _WavePropagationShader;
         [SerializeField] Material _TargetMaterial;
+
+        [Header("Wave Data")]
+        [SerializeField] float _DefaultWaveStrenght = 1f;
+        [SerializeField] float _DefaultDecayPerSecond = 1f;
+        [SerializeField] float _DefaultSpeed = 2f;
+        [SerializeField] float _DefaultLineThickness = 0.1f;
+
         RenderTexture _TargetTexture;
-        const int _TextureSize = 32;
-
-        //Wave Propagation
-        int _WavePropagationHandle;
-
-        //Adding new Waves
-        int _AddNewWavesHandle;
-        List<Coord> _NewWaveOrigins = new List<Coord>();
-        ComputeBuffer _NewWaveOriginsBuffer;
-
-
-
-        void InitializeWavePropagationShader()
-        {
-            _WavePropagationHandle = _WavePropagationShader.FindKernel("PropagateWaves");
-            _AddNewWavesHandle = _WavePropagationShader.FindKernel("AddNewWaves");
-        }
+        const int _TextureSize = 1024;
+        
         void CreateRenderTexture(ref RenderTexture texture, int width, int height)
         {
-            texture = new RenderTexture(width, height, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
+            texture = new RenderTexture(width, height, 0, RenderTextureFormat.RFloat, RenderTextureReadWrite.sRGB);
             texture.filterMode = FilterMode.Point;
             texture.name = "WavePropagationTexture (Generated)";
             texture.wrapMode = TextureWrapMode.Repeat;
             texture.enableRandomWrite = true;
             texture.Create();
         }
-        void CreateBuffers()
-        {
-            int stride = sizeof(int) * 2;
-            int amountOfStrides = 10;
-            _NewWaveOriginsBuffer = new ComputeBuffer(stride * amountOfStrides, stride, ComputeBufferType.Append, ComputeBufferMode.Immutable);
-        }
-        void InitializeRenderTarget()
-        {
-            CreateRenderTexture(ref _TargetTexture, _TextureSize, _TextureSize);
-            _TargetMaterial.SetTexture("_BaseMap", _TargetTexture);
-        }
+
+        //void ClearTargetTexture()
+        //{
+        //    for (int x = 0; x < _TextureSize; x++)
+        //    {
+        //        for (int y = 0; y < _TextureSize; y++)
+        //        {
+        //            _TargetTexture.SetPixel(x, y, Color.black);
+        //        }
+        //    }
+        //}
+
+        // Start is called before the first frame update
         void Start()
         {
-            InitializeWavePropagationShader();
-            InitializeRenderTarget();
-            CreateBuffers();
-
-            _NewWaveOrigins.Add(new Coord(Random.Range(0, _TextureSize), Random.Range(0, _TextureSize)));
-            _NewWaveOrigins.Add(new Coord(Random.Range(0, _TextureSize), Random.Range(0, _TextureSize)));
-            _NewWaveOrigins.Add(new Coord(Random.Range(0, _TextureSize), Random.Range(0, _TextureSize)));
-            _NewWaveOrigins.Add(new Coord(Random.Range(0, _TextureSize), Random.Range(0, _TextureSize)));
-            _NewWaveOrigins.Add(new Coord(Random.Range(0, _TextureSize), Random.Range(0, _TextureSize)));
-            _NewWaveOrigins.Add(new Coord(Random.Range(0, _TextureSize), Random.Range(0, _TextureSize)));
-            //RunWavePropagation();
-        }
-        private void OnDestroy()
-        {
-            if (_NewWaveOriginsBuffer.IsValid()) _NewWaveOriginsBuffer.Dispose();
-        }
-
-        void RunWavePropagation()
-        {
-            //Set Data
-            _WavePropagationShader.SetTexture(_WavePropagationHandle, "TargetTexture", _TargetTexture);
-
-            //Run Shader
-            _WavePropagationShader.Dispatch(_WavePropagationHandle, 1024 / 8, 1024 / 8, 1);
-
-            Debug.Log("Wave Propagation ran");
-        }
-
-        void RunAddNewWaves()
-        {
-            if (_NewWaveOrigins.Count > 0)
-            {
-                _NewWaveOriginsBuffer.SetData(_NewWaveOrigins.ToArray());
-                _NewWaveOriginsBuffer.SetCounterValue((uint)_NewWaveOrigins.Count);
-
-                //Set Data
-                _WavePropagationShader.SetTexture(_AddNewWavesHandle, "TargetTexture", _TargetTexture);
-                _WavePropagationShader.SetBuffer(_AddNewWavesHandle, "NewCoords", _NewWaveOriginsBuffer);
-
-                //Run Shader
-                _WavePropagationShader.Dispatch(_AddNewWavesHandle, Mathf.CeilToInt(_NewWaveOrigins.Count / 8f), 1, 1);
-
-                Debug.Log("new waves added");
-                _NewWaveOrigins.Clear();
-            }
-
+            CreateRenderTexture(ref _TargetTexture, _TextureSize, _TextureSize);
+            //ClearTargetTexture();
+            //ApplyTexture();
+            _TargetMaterial.SetTexture("_BaseMap", _TargetTexture);
         }
 
         // Update is called once per frame
         void Update()
         {
-            RunAddNewWaves();
+            //ClearTargetTexture();
+            UpdateWaves();
+            ValidateWaves();
+            FindObjectOfType<WaveDrawer>().DrawAllWaveSegments(_TargetTexture, _Waves);
+            //DrawWaves();
+            //ApplyTexture();
+        }
+        void UpdateWaves()
+        {
+            Profiler.BeginSample("UpdatingWaves");
+            for (int i =0; i < _Waves.Count; i++)
+            {
+                WaveSegment w = _Waves[i];
+                w.Strength -= w.StrenghtDecay * Time.deltaTime;
+                w.Radius += w.Speed * Time.deltaTime;
+                _Waves[i] = w;
+            }
+            Profiler.EndSample();
+        }
+        void ValidateWaves()
+        {
+            List<WaveSegment> _WavesToDestroy = new List<WaveSegment>();
+            foreach (WaveSegment wave in _Waves)
+            {
+                if (wave.Strength < 0f) _WavesToDestroy.Add(wave);
+                else if(wave.Radius > 1f) _WavesToDestroy.Add(wave);
+            }
+            foreach (WaveSegment wave in _WavesToDestroy)
+            {
+                _Waves.Remove(wave);
+            }
+        }
+        //void DrawWaves()
+        //{
+        //    foreach(WaveSegment wave in _Waves)
+        //    {
+        //        DrawCircle(_TargetTexture
+        //            , Mathf.RoundToInt(wave.Origin.x * _TextureSize)
+        //            , Mathf.RoundToInt(wave.Origin.y * _TextureSize)
+        //            , Mathf.RoundToInt(wave.Radius * _TextureSize)
+        //            , Mathf.RoundToInt(wave.Radius * _TextureSize - 3)
+        //            , wave.StartAngleRadian
+        //            , wave.AngleSize
+        //            , new Color(wave.Strength, 0, 0));
+        //    }
+        //}
+        //void ApplyTexture()
+        //{
+        //    _TargetTexture.Apply();
+        //}
+
+        public void SpawnWave(Vector2 normalisedPosition)
+        {
+            _Waves.Add(new WaveSegment()
+            {
+                Origin = normalisedPosition,
+                Radius = 0f,
+                Speed = _DefaultSpeed,
+                StrenghtDecay = _DefaultDecayPerSecond,
+                Strength = _DefaultWaveStrenght,
+                StartAngleRadian = 0,
+                AngleSize = 6.28f,
+                WaveThickness = _DefaultLineThickness,
+            }) ;
+
+
+            //StartAngleRadian = Random.Range(0, 6.28f),
+            //    AngleSize = Random.Range(0, 6.28f),
         }
 
-        public void SpawnWave(Vector2 normalisedTexturePosition)
-        {
-            Coord coord = new Coord
-            {
-                X = Mathf.FloorToInt(normalisedTexturePosition.x * _TextureSize),
-                Y = Mathf.FloorToInt(normalisedTexturePosition.y * _TextureSize),
-            };
-            Debug.Log("Coord: " + coord.X + ", " + coord.Y);
-            _NewWaveOrigins.Add(coord);
-        }
+        //public void DrawCircle(Texture2D tex, int circleX, int circleY, int outerRadius, int innerRadius, float startAngle, float angleSize, Color col)
+        //{
+        //    Profiler.BeginSample("DrawingCirlce");
+        //    int minXBound = Mathf.Max(circleX - outerRadius,0);
+        //    int maxXBound = Mathf.Min(circleX + outerRadius,tex.width);
+
+        //    int minYBound = Mathf.Max(circleY - outerRadius, 0);
+        //    int maxYBound = Mathf.Min(circleY + outerRadius, tex.width);
+
+        //    float sqrOuterRadius = outerRadius * outerRadius;
+        //    float sqrInnerRadius = innerRadius * innerRadius;
+
+        //    for (int x = minXBound; x < maxXBound; x++)
+        //    {
+        //        for (int y = minYBound; y < maxYBound; y++)
+        //        {
+        //            Vector2 posDiff = new Vector2(x, y) - new Vector2(circleX, circleY);
+        //            float angle = Mathf.Atan2(posDiff.y, posDiff.x) + 3.14f;
+        //            float sqrDistanceToOrigin = posDiff.sqrMagnitude;
+
+        //            if (sqrDistanceToOrigin < sqrOuterRadius 
+        //                && sqrDistanceToOrigin > sqrInnerRadius 
+        //                && angle > startAngle 
+        //                && angle < startAngle + angleSize )
+        //            {
+        //                tex.SetPixel(x, y, col);
+        //            }
+        //        }
+        //    }
+        //    Profiler.EndSample();
+        //}
     }
 }

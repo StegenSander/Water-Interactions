@@ -1,0 +1,66 @@
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel DrawWaveSegments
+
+// Create a RenderTexture with enableRandomWrite flag and set it
+// with cs.SetTexture
+
+struct WaveSegment
+{
+    float2 origin;
+    
+    float strenght;
+    float strengthDecay;
+    
+    float radius;
+    float speed;
+    
+    float waveThickness;
+    
+    float segmentStartAngle;
+    float segmentAngleSize;
+};
+
+
+StructuredBuffer<WaveSegment> WaveSegments;
+int WaveSegmentCount;
+int TextureSize;
+
+RWTexture2D<float4> TargetTexture;
+
+//Functions
+float drawColorForWave(WaveSegment wave, int2 id);
+
+[numthreads(8,8,1)]
+void DrawWaveSegments (uint3 id : SV_DispatchThreadID)
+{
+    float totalValue = 0.f;
+    for (int i = 0; i < WaveSegmentCount; i++)
+    {
+        totalValue += drawColorForWave(WaveSegments[i], id.xy);
+    }
+    
+    TargetTexture[id.xy] = totalValue;
+}
+
+float drawColorForWave(WaveSegment wave, int2 pos)
+{
+    float2 actualOrigin = wave.origin * TextureSize;;
+    float actualRadius = wave.radius * TextureSize;
+    float actualWaveThickness = wave.waveThickness * TextureSize;
+    
+    float2 posDiff = pos - actualOrigin;
+    float sqrDistance = posDiff.x * posDiff.x + posDiff.y * posDiff.y;
+    float actualDistance = sqrt(sqrDistance);
+    
+    //Calculate result based on distance to the top of the line
+    float result = (actualWaveThickness - abs(actualDistance - actualRadius)) / actualWaveThickness;
+    result *= wave.strenght;
+    
+    //To segment
+    float angle = atan2(posDiff.y, posDiff.x) + 3.14f;
+    if (angle < wave.segmentStartAngle || angle > wave.segmentStartAngle + wave.segmentAngleSize)
+        result = 0;
+    
+    return max(0, result );
+}
+

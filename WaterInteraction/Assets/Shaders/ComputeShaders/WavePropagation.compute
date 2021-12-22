@@ -1,30 +1,91 @@
 // Each #kernel tells which function to compile; you can have many kernels
 #pragma kernel PropagateWaves
 #pragma kernel AddNewWaves
+#pragma kernel CalculateFinalWaveMap
 
-struct Coord
+struct WaveCell
 {
-    int x;
-    int y;
+    float strenght;
+    float speed;
+    float decayPerCellMoved;
+    int2 origin;
 };
 
-// Create a RenderTexture with enableRandomWrite flag and set it
-// with cs.SetTexture
-RWTexture2D<float4> TargetTexture;
-ConsumeStructuredBuffer<Coord> NewCoords;
+//Output
+RWTexture2D<float> TargetTexture;
+
+//Input
+ConsumeStructuredBuffer<WaveCell> NewCoords;
+RWStructuredBuffer<WaveCell> ReadWaveCellBuffer;
+RWStructuredBuffer<WaveCell> TargetWaveCellBuffer;
 
 
+float DeltaTime;
+float DecayPerSecond;
 
+int TextureWidth;
+int TextureHeight;
+
+//Function declarations
+int CoordToInt(int x, int y);
+bool IsCoordInTextureBoundaries(int2 coord);
+
+//Add new wave to the existing simulation
 [numthreads(8, 1, 1)]
 void AddNewWaves(uint3 id : SV_DispatchThreadID)
 {
-    Coord c = NewCoords.Consume();
-    uint2 coord = uint2(c.x, c.y);
-    TargetTexture[coord] = float4(1.0,0.0, 0.0, 1.0);
+    WaveCell c = NewCoords.Consume();
+    if (IsCoordInTextureBoundaries(c.origin))
+    {
+        TargetWaveCellBuffer[CoordToInt(c.origin.x, c.origin.y)] = c;
+    }
 }
 
+//Updates the waves in the current simulation
 [numthreads(8, 8, 1)]
 void PropagateWaves(uint3 id : SV_DispatchThreadID)
 {
-    TargetTexture[id.xy] = float4(id.x & id.y, (id.x & 15) / 15.0, (id.y & 15) / 15.0, 0.0);
+    WaveCell cell = ReadWaveCellBuffer[CoordToInt(id.x, id.y)];
+    float currentStrength = cell.strenght;
+    currentStrength -= DeltaTime * DecayPerSecond;
+    
+    //TargetWaveCellBuffer[CoordToInt(id.x, id.y )].strenght = max(currentStrength, 0);
+    int2 moveDir = (int2) id.xy - cell.origin;
+    if (moveDir.x == 0 && moveDir.y == 0)
+    {
+        TargetWaveCellBuffer[CoordToInt(id.x + 1, id.y)].strenght = max(currentStrength, 0);
+        TargetWaveCellBuffer[CoordToInt(id.x - 1, id.y)].strenght = max(currentStrength, 0);
+        TargetWaveCellBuffer[CoordToInt(id.x, id.y + 1)].strenght = max(currentStrength, 0);
+        TargetWaveCellBuffer[CoordToInt(id.x, id.y - 1)].strenght = max(currentStrength, 0);
+    }
+    else
+    {
+        if (moveDir.x > 1)
+            moveDir.x = 1;
+        if (moveDir.x < -1)
+            moveDir.x = -1;
+        if (moveDir.y > 1)
+            moveDir.y = 1;
+        if (moveDir.y < -1)
+            moveDir.y = -1;
+        TargetWaveCellBuffer[CoordToInt(id.x + moveDir.x, id.y + moveDir.y)].strenght = max(currentStrength, 0);
+    }
+}
+
+//Combines all input to generate 1 final map
+[numthreads(8, 8, 1)]
+void CalculateFinalWaveMap(uint3 id : SV_DispatchThreadID)
+{
+    TargetTexture[id.xy].r = ReadWaveCellBuffer[CoordToInt(id.x, id.y)].strenght;
+}
+
+///HELPERS
+int CoordToInt(int x, int y)
+{
+    return (y) * TextureWidth + (x );
+}
+
+bool IsCoordInTextureBoundaries(int2 coord)
+{
+    return coord.x >= 0 && coord.x <= TextureWidth && coord.y >= 0 && coord.y <= TextureHeight;
 }
