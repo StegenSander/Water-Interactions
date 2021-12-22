@@ -208,6 +208,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1414897046}
+  - component: {fileID: 1414897048}
   - component: {fileID: 1414897045}
   - component: {fileID: 1414897047}
   m_Layer: 0
@@ -226,11 +227,14 @@ MonoBehaviour:
   m_GameObject: {fileID: 1414897044}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 53a6b2d26a02e944291f5a0bcd4c61bf, type: 3}
+  m_Script: {fileID: 11500000, guid: e863ae0f03a2573458483a5bf9783f03, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _WavePropagationShader: {fileID: 7200000, guid: f1545e0d76df13048975b40f397cf176, type: 3}
   _TargetMaterial: {fileID: 2100000, guid: 79c072c5c5f1b02418453a2d4272abea, type: 2}
+  _DefaultWaveStrenght: 1
+  _DefaultDecayPerSecond: 0.1
+  _DefaultSpeed: 1
+  _DefaultLineThickness: 0.01
 --- !u!4 &1414897046
 Transform:
   m_ObjectHideFlags: 0
@@ -258,6 +262,19 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   _TargetField: {fileID: 1770052373}
+--- !u!114 &1414897048
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1414897044}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0787f5722d8a6664dac97234178ea87a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _DrawWaveSegments: {fileID: 7200000, guid: 810a7c4b46f024046b9d8589202e16c5, type: 3}
 --- !u!1 &1770052371
 GameObject:
   m_ObjectHideFlags: 0
