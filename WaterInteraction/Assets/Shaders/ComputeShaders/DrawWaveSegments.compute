@@ -18,49 +18,85 @@ struct WaveSegment
     
     float segmentStartAngle;
     float segmentAngleSize;
+    
+    int isSegmented;
 };
 
 
-StructuredBuffer<WaveSegment> WaveSegments;
+RWStructuredBuffer<WaveSegment> WaveSegments;
 int WaveSegmentCount;
-int TextureSize;
 
+int TargetTextureSize;
 RWTexture2D<float4> TargetTexture;
 
+int CollisionTextureSize;
+Texture2D<float4> CollisionTexture;
+
 //Functions
-float drawColorForWave(WaveSegment wave, int2 id);
+float4 DrawColorForWave(WaveSegment wave, int2 id);
+float4 ApplyCollisionTexture(float4 color, uint2 pos);
 
 [numthreads(8,8,1)]
 void DrawWaveSegments (uint3 id : SV_DispatchThreadID)
 {
-    float totalValue = 0.f;
+    float4 totalValue = 0.f;
+    
+    //Visualize collision
+    float textureScalar = (CollisionTextureSize / (float) TargetTextureSize);
+    uint2 posOnCollisionTexture = id.xy * textureScalar;
+    totalValue.g = CollisionTexture[posOnCollisionTexture].g;
+    
+    //Visualise Waves
     for (int i = 0; i < WaveSegmentCount; i++)
     {
-        totalValue += drawColorForWave(WaveSegments[i], id.xy);
+        totalValue += DrawColorForWave(WaveSegments[i], id.xy);
     }
+    
+    //if (id.x + id.y == 0)
+    //{
+    //    for (int i = 0; i < WaveSegmentCount; i++)
+    //    {
+    //        WaveSegments[i].segmentAngleSize = 3.14f;
+    //    }
+    //}
     
     TargetTexture[id.xy] = totalValue;
 }
 
-float drawColorForWave(WaveSegment wave, int2 pos)
+float4 DrawColorForWave(WaveSegment wave, int2 pos)
 {
-    float2 actualOrigin = wave.origin * TextureSize;;
-    float actualRadius = wave.radius * TextureSize;
-    float actualWaveThickness = wave.waveThickness * TextureSize;
+    float2 actualOrigin = wave.origin * TargetTextureSize;
+    float actualRadius = wave.radius * TargetTextureSize;
+    float actualWaveThickness = wave.waveThickness * TargetTextureSize;
     
     float2 posDiff = pos - actualOrigin;
     float sqrDistance = posDiff.x * posDiff.x + posDiff.y * posDiff.y;
     float actualDistance = sqrt(sqrDistance);
     
     //Calculate result based on distance to the top of the line
-    float result = (actualWaveThickness - abs(actualDistance - actualRadius)) / actualWaveThickness;
-    result *= wave.strenght;
+    float4 result = (float4)0;
+    result.r = (actualWaveThickness - abs(actualDistance - actualRadius)) / actualWaveThickness;
+    result.r *= wave.strenght;
     
     //To segment
-    float angle = atan2(posDiff.y, posDiff.x) + 3.14f;
-    if (angle < wave.segmentStartAngle || angle > wave.segmentStartAngle + wave.segmentAngleSize)
-        result = 0;
+    float angle = atan2(posDiff.y, posDiff.x);
+
+    if (angle < 0)
+        angle = 6.28 + angle;
+    if ((angle < wave.segmentStartAngle || angle > wave.segmentStartAngle + wave.segmentAngleSize)
+        && (angle - 6.28f < wave.segmentStartAngle || angle - 6.28f > wave.segmentStartAngle + wave.segmentAngleSize))
+        result.r = 0;
+    
+    result = ApplyCollisionTexture(result, pos);
     
     return max(0, result );
+}
+
+float4 ApplyCollisionTexture(float4 color, uint2 pos)
+{
+    float textureScalar = (CollisionTextureSize / (float) TargetTextureSize);
+    uint2 posOnCollisionTexture = pos * textureScalar;
+    color.r = min(1.f - CollisionTexture[posOnCollisionTexture].g, color.r);
+    return color;
 }
 

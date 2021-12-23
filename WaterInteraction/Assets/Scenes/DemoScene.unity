@@ -208,6 +208,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1414897046}
+  - component: {fileID: 1414897049}
   - component: {fileID: 1414897048}
   - component: {fileID: 1414897045}
   - component: {fileID: 1414897047}
@@ -233,8 +234,11 @@ MonoBehaviour:
   _TargetMaterial: {fileID: 2100000, guid: 79c072c5c5f1b02418453a2d4272abea, type: 2}
   _DefaultWaveStrenght: 1
   _DefaultDecayPerSecond: 0.1
-  _DefaultSpeed: 1
+  _DefaultSpeed: 0.1
   _DefaultLineThickness: 0.01
+  _CollisionTexture: {fileID: 2800000, guid: 55a645f3c1ae5bd48bc9b07b8c95ead4, type: 3}
+  _CircleIterationAtRadius1: 360
+  _EnableBounceBack: 0
 --- !u!4 &1414897046
 Transform:
   m_ObjectHideFlags: 0
@@ -275,6 +279,19 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   _DrawWaveSegments: {fileID: 7200000, guid: 810a7c4b46f024046b9d8589202e16c5, type: 3}
+--- !u!114 &1414897049
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1414897044}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8adc74b39533982479d606d8b0ccc12e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _AmountOfStartObject: 1024
 --- !u!1 &1770052371
 GameObject:
   m_ObjectHideFlags: 0
