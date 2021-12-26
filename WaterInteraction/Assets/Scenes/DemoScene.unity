@@ -337,10 +337,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _NavierStokesShader: {fileID: 7200000, guid: f735f6a99fd0bfd4fb9e6f4a08e21dcd, type: 3}
   _TargetMaterial: {fileID: 2100000, guid: 79c072c5c5f1b02418453a2d4272abea, type: 2}
+  _CollisionTexture: {fileID: 2800000, guid: 55a645f3c1ae5bd48bc9b07b8c95ead4, type: 3}
   _TextureSize: 32
-  _VelocityFieldStartValues: {x: 0, y: 0, z: 0, w: 0}
-  _DensityFieldStartValues: {x: 0.1, y: 0, z: 0, w: 1}
-  _DiffuseRate: 10
+  _VelocityFieldStartValues: {x: 0, y: 0, z: 0, w: 1}
+  _DensityFieldStartValues: {x: 0, y: 0, z: 0, w: 1}
+  _DensityDiffuseRate: 10
+  _VelocityDiffuseRate: 10
 --- !u!4 &1535628208
 Transform:
   m_ObjectHideFlags: 0

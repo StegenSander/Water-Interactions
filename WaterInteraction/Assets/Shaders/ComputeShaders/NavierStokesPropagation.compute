@@ -3,6 +3,8 @@
 #pragma kernel RenderHeightMap
 #pragma kernel HandleNewWaves
 #pragma kernel DiffuseDensity
+#pragma kernel DiffuseVelocity
+#pragma kernel HandleCollision;
 
 //Functions
 int2 GetClampedCoord(int2 pos);
@@ -13,15 +15,15 @@ struct NewWaveData
     float strength;
 };
 
-// Create a RenderTexture with enableRandomWrite flag and set it
-// with cs.SetTexture
 RWTexture2D<float4> TargetTexture;
 
-Texture2D<float3> VelocityFieldIN;
-RWTexture2D<float3> VelocityFieldOUT;
+Texture2D<float4> VelocityFieldIN;
+RWTexture2D<float4> VelocityFieldOUT;
 
 Texture2D<float> DensityFieldIN;
 RWTexture2D<float> DensityFieldOUT;
+
+Texture2D<float4> CollisionTexture;
 
 StructuredBuffer<NewWaveData> NewWaveBuffer;
 
@@ -46,27 +48,70 @@ void HandleNewWaves(uint3 id : SV_DispatchThreadID)
 {
     int2 pos = NewWaveBuffer[id.x].normalisedPosition * TextureSize;
     DensityFieldOUT[pos].r = DensityFieldOUT[pos].r + NewWaveBuffer[id.x].strength;
+    
+    const int2 OFFSETLEFT = int2(-1, 0);
+    const int2 OFFSETRIGHT = int2(1, 0);
+    const int2 OFFSETUP = int2(0, 1);
+    const int2 OFFSETDOWN = int2(0, -1);
+    
+    VelocityFieldOUT[pos + OFFSETLEFT] = VelocityFieldOUT[pos + OFFSETLEFT] + float4(OFFSETLEFT, 0, 1) * 10;
+    VelocityFieldOUT[pos + OFFSETRIGHT] = VelocityFieldOUT[pos + OFFSETRIGHT] + float4(OFFSETRIGHT, 0, 1) * 10;
+    VelocityFieldOUT[pos + OFFSETUP] = VelocityFieldOUT[pos + OFFSETUP] + float4(OFFSETUP, 0, 1) * 10;
+    VelocityFieldOUT[pos + OFFSETDOWN] = VelocityFieldOUT[pos + OFFSETDOWN] + float4(OFFSETDOWN, 0, 1) * 10;
 }
 
 [numthreads(8, 8, 1)]
 void DiffuseDensity(uint3 id : SV_DispatchThreadID)
 {
-    int2 offsetLeft = int2(-1, 0);
-    int2 offsetRight = int2(1, 0);
-    int2 offsetUp = int2(0, 1);
-    int2 offsetDown = int2(0, -1);
+    const int2 OFFSETLEFT = int2(-1, 0);
+    const int2 OFFSETRIGHT = int2(1, 0);
+    const int2 OFFSETUP = int2(0, 1);
+    const int2 OFFSETDOWN = int2(0, -1);
     
     float lossScalar = DiffuseRate * DeltaTime;
     float lossThisFrame = 4 * lossScalar * DensityFieldIN[id.xy].x;
     float gainThisFrame 
-    = DensityFieldIN[GetClampedCoord(id.xy + offsetLeft)].x * lossScalar
-    + DensityFieldIN[GetClampedCoord(id.xy + offsetRight)].x * lossScalar
-    + DensityFieldIN[GetClampedCoord(id.xy + offsetUp)].x * lossScalar
-    + DensityFieldIN[GetClampedCoord(id.xy + offsetDown)].x * lossScalar;
+    = DensityFieldIN[GetClampedCoord(id.xy + OFFSETLEFT)].x * lossScalar
+    + DensityFieldIN[GetClampedCoord(id.xy + OFFSETRIGHT)].x * lossScalar
+    + DensityFieldIN[GetClampedCoord(id.xy + OFFSETUP)].x * lossScalar
+    + DensityFieldIN[GetClampedCoord(id.xy + OFFSETDOWN)].x * lossScalar;
     
     DensityFieldOUT[id.xy].x = DensityFieldIN[id.xy].x - lossThisFrame + gainThisFrame;
     DensityFieldOUT[id.xy].x = clamp(DensityFieldOUT[id.xy].x, 0, 1);
 
+}
+
+[numthreads(8, 8, 1)]
+void DiffuseVelocity(uint3 id : SV_DispatchThreadID)
+{
+    const int2 OFFSETLEFT = int2(-1, 0);
+    const int2 OFFSETRIGHT = int2(1, 0);
+    const int2 OFFSETUP = int2(0, 1);
+    const int2 OFFSETDOWN = int2(0, -1);
+    
+    float lossScalar = DiffuseRate * DeltaTime;
+    float4 lossThisFrame = 4 * lossScalar * VelocityFieldIN[id.xy];
+    float4 gainThisFrame
+    = VelocityFieldIN[id.xy + OFFSETLEFT] * lossScalar
+    + VelocityFieldIN[id.xy + OFFSETRIGHT] * lossScalar
+    + VelocityFieldIN[id.xy + OFFSETUP] * lossScalar
+    + VelocityFieldIN[id.xy + OFFSETDOWN] * lossScalar;
+    
+    VelocityFieldOUT[id.xy] = VelocityFieldIN[id.xy] - lossThisFrame + gainThisFrame;
+    VelocityFieldOUT[id.xy] = clamp(VelocityFieldOUT[id.xy], 0, 1);
+
+}
+
+[numthreads(8, 8, 1)]
+void HandleCollision(uint3 id : SV_DispatchThreadID)
+{
+    float width;
+    float height;
+    CollisionTexture.GetDimensions(width, height);
+    float textureScalar = width / TextureSize;
+    
+    VelocityFieldOUT[id.xy] = VelocityFieldOUT[id.xy] * (1 - CollisionTexture[id.xy * textureScalar].g);
+    DensityFieldOUT[id.xy] = DensityFieldOUT[id.xy] * (1 - CollisionTexture[id.xy * textureScalar].g);
 }
 
 int2 GetClampedCoord(int2 pos)
@@ -78,5 +123,12 @@ int2 GetClampedCoord(int2 pos)
 [numthreads(8, 8, 1)]
 void RenderHeightMap(uint3 id : SV_DispatchThreadID)
 {
-    TargetTexture[id.xy] = DensityFieldIN[id.xy];
+    float width;
+    float height;
+    CollisionTexture.GetDimensions(width, height);
+    float textureScalar = width / TextureSize;
+    TargetTexture[id.xy]
+        = DensityFieldIN[id.xy]
+        +VelocityFieldIN[id.xy];
+        //+ CollisionTexture[id.xy * textureScalar].g;
 }
