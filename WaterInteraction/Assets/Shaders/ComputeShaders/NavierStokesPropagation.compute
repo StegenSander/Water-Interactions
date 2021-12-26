@@ -1,0 +1,82 @@
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel FillTexture
+#pragma kernel RenderHeightMap
+#pragma kernel HandleNewWaves
+#pragma kernel DiffuseDensity
+
+//Functions
+int2 GetClampedCoord(int2 pos);
+
+struct NewWaveData
+{
+    float2 normalisedPosition;
+    float strength;
+};
+
+// Create a RenderTexture with enableRandomWrite flag and set it
+// with cs.SetTexture
+RWTexture2D<float4> TargetTexture;
+
+Texture2D<float3> VelocityFieldIN;
+RWTexture2D<float3> VelocityFieldOUT;
+
+Texture2D<float> DensityFieldIN;
+RWTexture2D<float> DensityFieldOUT;
+
+StructuredBuffer<NewWaveData> NewWaveBuffer;
+
+float DeltaTime;
+float DiffuseRate;
+
+int TextureSize;
+
+//FillTextureKernelONLY
+float4 TextureFillValue;
+RWTexture2D<float4> TextureToFill;
+
+
+[numthreads(8, 8, 1)]
+void FillTexture(uint3 id : SV_DispatchThreadID)
+{
+    TextureToFill[id.xy] = TextureFillValue;
+}
+
+[numthreads(8, 1, 1)]
+void HandleNewWaves(uint3 id : SV_DispatchThreadID)
+{
+    int2 pos = NewWaveBuffer[id.x].normalisedPosition * TextureSize;
+    DensityFieldOUT[pos].r = DensityFieldOUT[pos].r + NewWaveBuffer[id.x].strength;
+}
+
+[numthreads(8, 8, 1)]
+void DiffuseDensity(uint3 id : SV_DispatchThreadID)
+{
+    int2 offsetLeft = int2(-1, 0);
+    int2 offsetRight = int2(1, 0);
+    int2 offsetUp = int2(0, 1);
+    int2 offsetDown = int2(0, -1);
+    
+    float lossScalar = DiffuseRate * DeltaTime;
+    float lossThisFrame = 4 * lossScalar * DensityFieldIN[id.xy].x;
+    float gainThisFrame 
+    = DensityFieldIN[GetClampedCoord(id.xy + offsetLeft)].x * lossScalar
+    + DensityFieldIN[GetClampedCoord(id.xy + offsetRight)].x * lossScalar
+    + DensityFieldIN[GetClampedCoord(id.xy + offsetUp)].x * lossScalar
+    + DensityFieldIN[GetClampedCoord(id.xy + offsetDown)].x * lossScalar;
+    
+    DensityFieldOUT[id.xy].x = DensityFieldIN[id.xy].x - lossThisFrame + gainThisFrame;
+    DensityFieldOUT[id.xy].x = clamp(DensityFieldOUT[id.xy].x, 0, 1);
+
+}
+
+int2 GetClampedCoord(int2 pos)
+{
+    //return min(TextureSize-1, max(pos, 0));
+    return clamp(pos, 0, TextureSize - 1);
+}
+
+[numthreads(8, 8, 1)]
+void RenderHeightMap(uint3 id : SV_DispatchThreadID)
+{
+    TargetTexture[id.xy] = DensityFieldIN[id.xy];
+}

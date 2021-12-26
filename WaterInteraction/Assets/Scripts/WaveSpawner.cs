@@ -10,13 +10,13 @@ namespace WaterInteraction
 
     public class WaveSpawner : MonoBehaviour
     {
-        WavePropagation _WavePropagation;
+        NavierStokesPropagation _WavePropagation;
         [SerializeField] Image _TargetField;
         Rect _TargetArea;
         // Start is called before the first frame update
         void Start()
         {
-            _WavePropagation = FindObjectOfType<WavePropagation>();
+            _WavePropagation = FindObjectOfType<NavierStokesPropagation>();
             InitializeTargetField();
         }
 

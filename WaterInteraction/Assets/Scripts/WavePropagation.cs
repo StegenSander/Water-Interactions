@@ -281,7 +281,7 @@ namespace WaterInteraction
             //Vector2 pos = hitSegment.Origin + directionFromOrigin * (hitSegment.Radius-scalar);
             // SpawnWave(pos, 0f, hitSegment.Strength / 2, hitSegment.StartAngleRadian + hitSegment.AngleSize, hitSegment.StartAngleRadian + 6.28f);
             hitSegment.Origin = hitSegment.Origin + directionFromOrigin * (hitSegment.Radius - scalar);
-            hitSegment.Strength /= 2;
+            hitSegment.Strength = (hitSegment.Strength - 0.1f)/2;
             hitSegment.StartAngleRadian = hitSegment.StartAngleRadian + hitSegment.AngleSize;
             hitSegment.AngleSize = 6.28f - hitSegment.AngleSize;
             hitSegment.Radius = 0f;
