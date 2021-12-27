@@ -341,8 +341,11 @@ MonoBehaviour:
   _TextureSize: 32
   _VelocityFieldStartValues: {x: 0, y: 0, z: 0, w: 1}
   _DensityFieldStartValues: {x: 0, y: 0, z: 0, w: 1}
-  _DensityDiffuseRate: 10
-  _VelocityDiffuseRate: 10
+  _DensityDiffuseRate: 1
+  _VelocityDiffuseRate: 1
+  _SpeedScalar: 1
+  _DiffuseTextures: 0
+  _UpdateAlongVelocityField: 1
 --- !u!4 &1535628208
 Transform:
   m_ObjectHideFlags: 0

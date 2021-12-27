@@ -5,6 +5,8 @@
 #pragma kernel DiffuseDensity
 #pragma kernel DiffuseVelocity
 #pragma kernel HandleCollision;
+#pragma kernel UpdateDensityAlongVelocityField;
+#pragma kernel UpdateVelocityAlongVelocityField
 
 //Functions
 int2 GetClampedCoord(int2 pos);
@@ -30,6 +32,8 @@ StructuredBuffer<NewWaveData> NewWaveBuffer;
 float DeltaTime;
 float DiffuseRate;
 
+float SpeedScalar;
+
 int TextureSize;
 
 //FillTextureKernelONLY
@@ -54,10 +58,10 @@ void HandleNewWaves(uint3 id : SV_DispatchThreadID)
     const int2 OFFSETUP = int2(0, 1);
     const int2 OFFSETDOWN = int2(0, -1);
     
-    VelocityFieldOUT[pos + OFFSETLEFT] = VelocityFieldOUT[pos + OFFSETLEFT] + float4(OFFSETLEFT, 0, 1) * 10;
-    VelocityFieldOUT[pos + OFFSETRIGHT] = VelocityFieldOUT[pos + OFFSETRIGHT] + float4(OFFSETRIGHT, 0, 1) * 10;
-    VelocityFieldOUT[pos + OFFSETUP] = VelocityFieldOUT[pos + OFFSETUP] + float4(OFFSETUP, 0, 1) * 10;
-    VelocityFieldOUT[pos + OFFSETDOWN] = VelocityFieldOUT[pos + OFFSETDOWN] + float4(OFFSETDOWN, 0, 1) * 10;
+    VelocityFieldOUT[pos + OFFSETLEFT] = VelocityFieldOUT[pos + OFFSETLEFT] + float4(OFFSETLEFT, 0, 1);
+    VelocityFieldOUT[pos + OFFSETRIGHT] = VelocityFieldOUT[pos + OFFSETRIGHT] + float4(OFFSETRIGHT, 0, 1);
+    VelocityFieldOUT[pos + OFFSETUP] = VelocityFieldOUT[pos + OFFSETUP] + float4(OFFSETUP, 0, 1);
+    VelocityFieldOUT[pos + OFFSETDOWN] = VelocityFieldOUT[pos + OFFSETDOWN] + float4(OFFSETDOWN, 0, 1);
 }
 
 [numthreads(8, 8, 1)]
@@ -68,15 +72,15 @@ void DiffuseDensity(uint3 id : SV_DispatchThreadID)
     const int2 OFFSETUP = int2(0, 1);
     const int2 OFFSETDOWN = int2(0, -1);
     
-    float lossScalar = DiffuseRate * DeltaTime;
-    float lossThisFrame = 4 * lossScalar * DensityFieldIN[id.xy].x;
+    float lossScalar = DiffuseRate * DeltaTime * TextureSize * TextureSize;
+    //float lossThisFrame = 4 * lossScalar * DensityFieldIN[id.xy].x;
     float gainThisFrame 
-    = DensityFieldIN[GetClampedCoord(id.xy + OFFSETLEFT)].x * lossScalar
-    + DensityFieldIN[GetClampedCoord(id.xy + OFFSETRIGHT)].x * lossScalar
-    + DensityFieldIN[GetClampedCoord(id.xy + OFFSETUP)].x * lossScalar
-    + DensityFieldIN[GetClampedCoord(id.xy + OFFSETDOWN)].x * lossScalar;
+    = lossScalar * (DensityFieldIN[GetClampedCoord(id.xy + OFFSETLEFT)] 
+    + DensityFieldIN[GetClampedCoord(id.xy + OFFSETRIGHT)]
+    + DensityFieldIN[GetClampedCoord(id.xy + OFFSETUP)]
+    + DensityFieldIN[GetClampedCoord(id.xy + OFFSETDOWN)]);
     
-    DensityFieldOUT[id.xy].x = DensityFieldIN[id.xy].x - lossThisFrame + gainThisFrame;
+    DensityFieldOUT[id.xy].x = (DensityFieldIN[id.xy].x + gainThisFrame) / (1 + 4 * lossScalar);
     DensityFieldOUT[id.xy].x = clamp(DensityFieldOUT[id.xy].x, 0, 1);
 
 }
@@ -90,16 +94,55 @@ void DiffuseVelocity(uint3 id : SV_DispatchThreadID)
     const int2 OFFSETDOWN = int2(0, -1);
     
     float lossScalar = DiffuseRate * DeltaTime;
-    float4 lossThisFrame = 4 * lossScalar * VelocityFieldIN[id.xy];
     float4 gainThisFrame
-    = VelocityFieldIN[id.xy + OFFSETLEFT] * lossScalar
-    + VelocityFieldIN[id.xy + OFFSETRIGHT] * lossScalar
-    + VelocityFieldIN[id.xy + OFFSETUP] * lossScalar
-    + VelocityFieldIN[id.xy + OFFSETDOWN] * lossScalar;
+    = lossScalar * (VelocityFieldIN[id.xy + OFFSETLEFT]
+    + VelocityFieldIN[id.xy + OFFSETRIGHT]
+    + VelocityFieldIN[id.xy + OFFSETUP] 
+    + VelocityFieldIN[id.xy + OFFSETDOWN]);
     
-    VelocityFieldOUT[id.xy] = VelocityFieldIN[id.xy] - lossThisFrame + gainThisFrame;
-    VelocityFieldOUT[id.xy] = clamp(VelocityFieldOUT[id.xy], 0, 1);
+    VelocityFieldOUT[id.xy] = (VelocityFieldIN[id.xy] + gainThisFrame) / (1 + 4 * lossScalar);
+    VelocityFieldOUT[id.xy] = clamp(VelocityFieldOUT[id.xy], -1, 1);
 
+}
+
+[numthreads(8, 8, 1)]
+void UpdateDensityAlongVelocityField(uint3 id : SV_DispatchThreadID)
+{
+    float scalar = DeltaTime * TextureSize * SpeedScalar;
+    float2 offsetPos = id.xy - scalar * VelocityFieldIN[id.xy].xy;
+    offsetPos = clamp(offsetPos, 0.5f, TextureSize + 0.5f);
+    int2 offsetPosInt = int2(offsetPos);
+    
+    float xPerc1 = offsetPos.x - offsetPosInt.x;
+    float xPerc2 = 1 - xPerc1;
+    float yPerc1 = offsetPos.y - offsetPosInt.y;
+    float yPerc2 = 1 - yPerc1;
+    
+    DensityFieldOUT[id.xy]
+        = xPerc2 * (yPerc2 * DensityFieldIN[offsetPosInt]               + yPerc1 * DensityFieldIN[offsetPosInt + int2(0, 1)])
+        + xPerc1 * (yPerc2 * DensityFieldIN[offsetPosInt + int2(1, 0)]  + yPerc1 * DensityFieldIN[offsetPosInt + int2(1, 1)]);
+    
+}
+
+[numthreads(8, 8, 1)]
+void UpdateVelocityAlongVelocityField(uint3 id : SV_DispatchThreadID)
+{
+    float scalar = DeltaTime * TextureSize * SpeedScalar;
+    float2 offsetPos = id.xy - scalar * VelocityFieldIN[id.xy].xy;
+    offsetPos = clamp(offsetPos, 0.5f, TextureSize + 0.5f);
+    int2 offsetPosInt = int2(offsetPos);
+    
+    //Handle Edge Case
+    float xPerc1 = offsetPos.x - offsetPosInt.x;
+    float xPerc2 = 1 - xPerc1;
+    float yPerc1 = offsetPos.y - offsetPosInt.y;
+    float yPerc2 = 1 - yPerc1;
+    
+    VelocityFieldOUT[id.xy]
+        = xPerc2 * (yPerc2 * VelocityFieldIN[offsetPosInt]              + yPerc1 * VelocityFieldIN[offsetPosInt + int2(0, 1)])
+        + xPerc1 * (yPerc2 * VelocityFieldIN[offsetPosInt + int2(1, 0)] + yPerc1 * VelocityFieldIN[offsetPosInt + int2(1, 1)]);
+    
+    //Velocity updates not yet perfect, inactive cells stay inactive
 }
 
 [numthreads(8, 8, 1)]
@@ -127,8 +170,12 @@ void RenderHeightMap(uint3 id : SV_DispatchThreadID)
     float height;
     CollisionTexture.GetDimensions(width, height);
     float textureScalar = width / TextureSize;
-    TargetTexture[id.xy]
-        = DensityFieldIN[id.xy]
-        +VelocityFieldIN[id.xy];
+    
+    float4 velValue = VelocityFieldIN[id.xy];
+    velValue.xy = velValue.xy / 2.f + 0.5f;
+    TargetTexture[id.xy] = float4(0, 0, DensityFieldIN[id.xy], 1);
+    //TargetTexture[id.xy] = float4(velValue.xy, 0, 1);
+    //TargetTexture[id.xy] = float4(velValue.xy, DensityFieldIN[id.xy], 1);
+        //+ velValue;
         //+ CollisionTexture[id.xy * textureScalar].g;
 }
