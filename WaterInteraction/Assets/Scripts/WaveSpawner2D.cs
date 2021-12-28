@@ -8,7 +8,7 @@ using WaterInteraction;
 namespace WaterInteraction
 {
 
-    public class WaveSpawner : MonoBehaviour
+    public class WaveSpawner2D : MonoBehaviour
     {
         NavierStokesPropagation _WavePropagation;
         [SerializeField] Image _TargetField;
