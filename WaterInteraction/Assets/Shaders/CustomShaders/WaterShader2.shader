@@ -1,4 +1,4 @@
-Shader "Unlit/WaterShader2"
+Shader "WaterInteraction/WaterShader2"
 {
     Properties
     {
@@ -7,7 +7,8 @@ Shader "Unlit/WaterShader2"
         _InputMap("InputData", 2D) = "black"{}
     }
     SubShader
-    {
+    { 
+        Name "WaterShader"
         Tags {"Queue" = "Transparent" "IgnoreProjector" = "True" "RenderType" = "Transparent"}
         ZWrite Off
         Blend SrcAlpha OneMinusSrcAlpha

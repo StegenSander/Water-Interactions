@@ -196,7 +196,7 @@ namespace WaterInteraction
             {
                 _NewWaves.Add(new NewWaveData() { normalisedPosition = new Vector2(-1, -1) });
             }
-            _NavierStokesShader.SetBuffer(_KernelHandleNewWaves, "NewWaveBuffer", _NewWaveBuffer);
+            _NavierStokesShader.SetBuffer(_KernelHandleNewWaves, "NewOccupiedWaveBuffer", _NewWaveBuffer);
 
             if (_IsTexture1Input)
             {

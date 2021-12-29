@@ -7,15 +7,22 @@
 #pragma kernel HandleCollision;
 #pragma kernel UpdateDensityAlongVelocityField;
 #pragma kernel UpdateVelocityAlongVelocityField
+#pragma kernel CalculateMovedDensity
 
 //Functions
 int2 GetClampedCoord(int2 pos);
 void DoesVelocityEndUpInCell(int2 startCell, float2 startCellVel, int2 targetCell, out float percX, out float percY);
 
-struct NewWaveData
+struct NewOccupiedWaveCell
 {
     float2 normalisedPosition;
     float densityChange;
+};
+
+struct NewSpawnedWaveCell
+{
+    float2 normalisedPosition;
+    float densityGain;
 };
 
 int DebugDraw;
@@ -30,7 +37,8 @@ RWTexture2D<float> DensityFieldOUT;
 
 Texture2D<float4> CollisionTexture;
 
-StructuredBuffer<NewWaveData> NewWaveBuffer;
+int NewOccupiedWaveBufferCount;
+StructuredBuffer<NewOccupiedWaveCell> NewOccupiedWaveBuffer;
 
 float DeltaTime;
 float DiffuseRate;
@@ -43,6 +51,10 @@ int TextureSize;
 float4 TextureFillValue;
 RWTexture2D<float4> TextureToFill;
 
+//Spawning New Waves
+float DensityFreed;
+RWTexture2D<float2> SpawnWaveTexture;
+
 
 [numthreads(8, 8, 1)]
 void FillTexture(uint3 id : SV_DispatchThreadID)
@@ -51,9 +63,36 @@ void FillTexture(uint3 id : SV_DispatchThreadID)
 }
 
 [numthreads(1, 1, 1)]
+void CalculateMovedDensity(uint3 id : SV_DispatchThreadID)
+{
+    //if (NewOccupiedWaveBuffer[id.x].normalisedPosition.x < 0) return;
+    
+    const int2 OFFSETLEFT = int2(-1, 0);
+    const int2 OFFSETRIGHT = int2(1, 0);
+    const int2 OFFSETUP = int2(0, 1);
+    const int2 OFFSETDOWN = int2(0, -1);
+
+    float densityFreed = 0.f;
+    for (int i = 0; i < NewOccupiedWaveBufferCount; i++)
+    {
+        NewOccupiedWaveCell wave = NewOccupiedWaveBuffer[uint(i)];
+        int2 pos = wave.normalisedPosition * TextureSize;
+        
+        densityFreed += DensityFieldIN[pos].r;
+        SpawnWaveTexture[pos] = float2(1.f, 0.f);
+        
+        SpawnWaveTexture[pos + OFFSETLEFT] = float2(0.f, 1.f);
+        SpawnWaveTexture[pos + OFFSETRIGHT] = float2(0.f, 1.f);
+        SpawnWaveTexture[pos + OFFSETUP] = float2(0.f, 1.f);
+        SpawnWaveTexture[pos + OFFSETDOWN] = float2(0.f, 1.f);
+    }
+    DensityFreed = densityFreed;
+}
+
+[numthreads(1, 1, 1)]
 void HandleNewWaves(uint3 id : SV_DispatchThreadID)
 {
-    NewWaveData newWave = NewWaveBuffer[id.x];
+    NewOccupiedWaveCell newWave = NewOccupiedWaveBuffer[id.x];
     int2 pos = newWave.normalisedPosition * TextureSize;
     
     float currentStrenght = DensityFieldOUT[pos].r;
