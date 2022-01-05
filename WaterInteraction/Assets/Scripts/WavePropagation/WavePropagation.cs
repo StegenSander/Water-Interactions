@@ -234,7 +234,7 @@ namespace WaterInteraction
                     wave.StartAngleRadian = endAngle;
                     wave.AngleSize -= endAngle - wave.StartAngleRadian;
 
-                    hitSegment.StartAngleRadian = hitSegment.StartAngleRadian;
+                    //hitSegment.StartAngleRadian = hitSegment.StartAngleRadian;
                     hitSegment.AngleSize = endAngle - wave.StartAngleRadian;
 
                 }

@@ -17,6 +17,7 @@ struct NewOccupiedWaveCell
 {
     float2 normalisedPosition;
     float densityChange;
+    
 };
 
 struct NewSpawnedWaveCell
@@ -60,6 +61,7 @@ RWTexture2D<float2> SpawnWaveTexture;
 void FillTexture(uint3 id : SV_DispatchThreadID)
 {
     TextureToFill[id.xy] = TextureFillValue;
+    
 }
 
 [numthreads(1, 1, 1)]
@@ -133,16 +135,16 @@ void DiffuseDensity(uint3 id : SV_DispatchThreadID)
     const int2 OFFSETUP = int2(0, 1);
     const int2 OFFSETDOWN = int2(0, -1);
     
-    float lossScalar = DiffuseRate * DeltaTime * TextureSize * TextureSize;
-    //float lossThisFrame = 4 * lossScalar * DensityFieldIN[id.xy].x;
+    float scalar = DiffuseRate * DeltaTime * TextureSize * TextureSize;
+    
     float gainThisFrame 
-    = lossScalar * (DensityFieldIN[GetClampedCoord(id.xy + OFFSETLEFT)] 
+    = scalar 
+    * (DensityFieldIN[GetClampedCoord(id.xy + OFFSETLEFT)] 
     + DensityFieldIN[GetClampedCoord(id.xy + OFFSETRIGHT)]
     + DensityFieldIN[GetClampedCoord(id.xy + OFFSETUP)]
     + DensityFieldIN[GetClampedCoord(id.xy + OFFSETDOWN)]);
     
-    DensityFieldOUT[id.xy].x = (DensityFieldIN[id.xy].x + gainThisFrame) / (1 + 4 * lossScalar);
-    //DensityFieldOUT[id.xy].x = clamp(DensityFieldOUT[id.xy].x, 0, 1);
+    DensityFieldOUT[id.xy].x = (DensityFieldIN[id.xy].x + gainThisFrame) / (1 + 4 * scalar);
 
 }
 

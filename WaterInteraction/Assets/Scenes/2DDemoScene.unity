@@ -38,7 +38,7 @@ RenderSettings:
   m_ReflectionIntensity: 1
   m_CustomReflection: {fileID: 0}
   m_Sun: {fileID: 0}
-  m_IndirectSpecularColor: {r: 0.18028377, g: 0.22571409, b: 0.30692285, a: 1}
+  m_IndirectSpecularColor: {r: 0.18028378, g: 0.22571412, b: 0.30692285, a: 1}
   m_UseRadianceAmbientProbe: 0
 --- !u!157 &3
 LightmapSettings:
@@ -215,7 +215,7 @@ MonoBehaviour:
   _NavierStokesShader: {fileID: 7200000, guid: f735f6a99fd0bfd4fb9e6f4a08e21dcd, type: 3}
   _TargetMaterial: {fileID: 2100000, guid: 79c072c5c5f1b02418453a2d4272abea, type: 2}
   _CollisionTexture: {fileID: 2800000, guid: 55a645f3c1ae5bd48bc9b07b8c95ead4, type: 3}
-  _TextureSize: 32
+  _SimData: {fileID: 11400000, guid: 3bc634fa945963646985a5a276882c07, type: 2}
   _VelocityFieldStartValues: {x: 0, y: 0, z: 0, w: 1}
   _DensityFieldStartValues: {x: 0.5, y: 0, z: 0, w: 1}
   _DensityDiffuseRate: 1
