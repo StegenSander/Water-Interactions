@@ -43,7 +43,7 @@ namespace WaterInteraction
             float boundsVolumeInWater = PhysicsHelpers.GetVolumeOfBounds(PhysicsHelpers.GetOverlappingBounds(WaterBounds, _Collider.bounds));
             float boundsVolume = PhysicsHelpers.GetVolumeOfBounds(_Collider.bounds);
             float percentageInWater = boundsVolumeInWater / boundsVolume;
-            Debug.Log("Volume: " + boundsVolume + "Volume in Water" + boundsVolumeInWater + "Perc: " + percentageInWater);
+            //Debug.Log("Volume: " + boundsVolume + "Volume in Water" + boundsVolumeInWater + "Perc: " + percentageInWater);
             return percentageInWater;
         }
 

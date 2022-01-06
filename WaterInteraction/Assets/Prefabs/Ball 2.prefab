@@ -14,9 +14,9 @@ GameObject:
   - component: {fileID: 7216293474318309867}
   - component: {fileID: 7216293474318309879}
   - component: {fileID: 5926762627863350953}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: Ball 2
-  m_TagString: Untagged
+  m_TagString: WaterInteractable
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0

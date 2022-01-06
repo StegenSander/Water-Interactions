@@ -6,6 +6,9 @@ namespace WaterInteraction
 {
     public class WaveSpawner3D : MonoBehaviour
     {
+
+        [SerializeField] bool _UseClickToSpawnWaves = true;
+
         NavierStokesPropagation _WavePropagation;
         // Start is called before the first frame update
         void Start()
@@ -16,7 +19,7 @@ namespace WaterInteraction
         // Update is called once per frame
         void Update()
         {
-            if (Input.GetMouseButtonDown(0))
+            if (Input.GetMouseButtonDown(0) && _UseClickToSpawnWaves)
             {
                 Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
                 if (Physics.Raycast(ray, out RaycastHit hit, 100f))

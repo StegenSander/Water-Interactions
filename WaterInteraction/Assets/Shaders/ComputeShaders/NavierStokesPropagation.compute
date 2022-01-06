@@ -2,22 +2,22 @@
 #pragma kernel FillTexture
 #pragma kernel RenderHeightMap
 #pragma kernel HandleNewWaves
+#pragma kernel HandleSpawnWaves
 #pragma kernel DiffuseDensity
 #pragma kernel DiffuseVelocity
 #pragma kernel HandleCollision;
 #pragma kernel UpdateDensityAlongVelocityField;
 #pragma kernel UpdateVelocityAlongVelocityField
-#pragma kernel CalculateMovedDensity
 
 //Functions
 int2 GetClampedCoord(int2 pos);
 void DoesVelocityEndUpInCell(int2 startCell, float2 startCellVel, int2 targetCell, out float percX, out float percY);
+void SpawnWaveOnCell(uint2 pos, float scalar);
 
 struct NewOccupiedWaveCell
 {
     float2 normalisedPosition;
     float densityChange;
-    
 };
 
 struct NewSpawnedWaveCell
@@ -36,6 +36,9 @@ RWTexture2D<float4> VelocityFieldOUT;
 Texture2D<float> DensityFieldIN;
 RWTexture2D<float> DensityFieldOUT;
 
+Texture2D<float4> DynamicCollisionOld;
+Texture2D<float4> DynamicCollisionNew;
+
 Texture2D<float4> CollisionTexture;
 
 int NewOccupiedWaveBufferCount;
@@ -44,6 +47,7 @@ StructuredBuffer<NewOccupiedWaveCell> NewOccupiedWaveBuffer;
 float DeltaTime;
 float DiffuseRate;
 
+float InitialSpeedScalar;
 float SpeedScalar;
 
 int TextureSize;
@@ -64,31 +68,13 @@ void FillTexture(uint3 id : SV_DispatchThreadID)
     
 }
 
-[numthreads(1, 1, 1)]
-void CalculateMovedDensity(uint3 id : SV_DispatchThreadID)
+[numthreads(8, 8, 1)]
+void HandleSpawnWaves(uint3 id : SV_DispatchThreadID)
 {
-    //if (NewOccupiedWaveBuffer[id.x].normalisedPosition.x < 0) return;
+    float diff = DynamicCollisionNew[id.xy] - DynamicCollisionOld[id.xy];
     
-    const int2 OFFSETLEFT = int2(-1, 0);
-    const int2 OFFSETRIGHT = int2(1, 0);
-    const int2 OFFSETUP = int2(0, 1);
-    const int2 OFFSETDOWN = int2(0, -1);
-
-    float densityFreed = 0.f;
-    for (int i = 0; i < NewOccupiedWaveBufferCount; i++)
-    {
-        NewOccupiedWaveCell wave = NewOccupiedWaveBuffer[uint(i)];
-        int2 pos = wave.normalisedPosition * TextureSize;
-        
-        densityFreed += DensityFieldIN[pos].r;
-        SpawnWaveTexture[pos] = float2(1.f, 0.f);
-        
-        SpawnWaveTexture[pos + OFFSETLEFT] = float2(0.f, 1.f);
-        SpawnWaveTexture[pos + OFFSETRIGHT] = float2(0.f, 1.f);
-        SpawnWaveTexture[pos + OFFSETUP] = float2(0.f, 1.f);
-        SpawnWaveTexture[pos + OFFSETDOWN] = float2(0.f, 1.f);
-    }
-    DensityFreed = densityFreed;
+    if (abs(diff) > 0.1f)
+        SpawnWaveOnCell(id.xy, diff);
 }
 
 [numthreads(1, 1, 1)]
@@ -97,9 +83,11 @@ void HandleNewWaves(uint3 id : SV_DispatchThreadID)
     NewOccupiedWaveCell newWave = NewOccupiedWaveBuffer[id.x];
     int2 pos = newWave.normalisedPosition * TextureSize;
     
-    float currentStrenght = DensityFieldOUT[pos].r;
-    
-    
+    SpawnWaveOnCell(pos,1);
+}
+
+void SpawnWaveOnCell(uint2 pos, float scalar)
+{
     const int2 OFFSETLEFT = int2(-1, 0);
     const int2 OFFSETRIGHT = int2(1, 0);
     const int2 OFFSETUP = int2(0, 1);
@@ -110,21 +98,17 @@ void HandleNewWaves(uint3 id : SV_DispatchThreadID)
     const int2 OFFSETRIGHTDOWN = int2(1, -1);
     const int2 OFFSETRIGHTUP = int2(1, 1);
     
-    DensityFieldOUT[pos] = currentStrenght + newWave.densityChange;
-    //DensityFieldOUT[pos + OFFSETLEFT] = DensityFieldOUT[pos + OFFSETLEFT] + currentStrenght / 4;
-    //DensityFieldOUT[pos + OFFSETRIGHT] = DensityFieldOUT[pos + OFFSETRIGHT] + currentStrenght / 4;
-    //DensityFieldOUT[pos + OFFSETUP] = DensityFieldOUT[pos + OFFSETUP] + currentStrenght / 4;
-    //DensityFieldOUT[pos + OFFSETDOWN] = DensityFieldOUT[pos + OFFSETDOWN] + currentStrenght / 4;
+    float finalScalar = InitialSpeedScalar * scalar;
     
-    VelocityFieldOUT[pos + OFFSETLEFT] = VelocityFieldOUT[pos + OFFSETLEFT] + float4(OFFSETLEFT, 0, 1) * 10;
-    VelocityFieldOUT[pos + OFFSETRIGHT] = VelocityFieldOUT[pos + OFFSETRIGHT] + float4(OFFSETRIGHT, 0, 1) * 10;
-    VelocityFieldOUT[pos + OFFSETUP] = VelocityFieldOUT[pos + OFFSETUP] + float4(OFFSETUP, 0, 1) * 10;
-    VelocityFieldOUT[pos + OFFSETDOWN] = VelocityFieldOUT[pos + OFFSETDOWN] + float4(OFFSETDOWN, 0, 1) * 10;
+    VelocityFieldOUT[pos + OFFSETLEFT] = VelocityFieldOUT[pos + OFFSETLEFT] + float4(OFFSETLEFT, 0, 1) * finalScalar;
+    VelocityFieldOUT[pos + OFFSETRIGHT] = VelocityFieldOUT[pos + OFFSETRIGHT] + float4(OFFSETRIGHT, 0, 1) * finalScalar;
+    VelocityFieldOUT[pos + OFFSETUP] = VelocityFieldOUT[pos + OFFSETUP] + float4(OFFSETUP, 0, 1) * finalScalar;
+    VelocityFieldOUT[pos + OFFSETDOWN] = VelocityFieldOUT[pos + OFFSETDOWN] + float4(OFFSETDOWN, 0, 1) * finalScalar;
     
-    VelocityFieldOUT[pos + OFFSETLEFTDOWN] = VelocityFieldOUT[pos + OFFSETLEFTDOWN] + float4(OFFSETLEFTDOWN / length(OFFSETLEFTDOWN), 0, 1) * 10;
-    VelocityFieldOUT[pos + OFFSETLEFTUP] = VelocityFieldOUT[pos + OFFSETLEFTUP] + float4(OFFSETLEFTUP / length(OFFSETLEFTUP), 0, 1) * 10;
-    VelocityFieldOUT[pos + OFFSETRIGHTDOWN] = VelocityFieldOUT[pos + OFFSETRIGHTDOWN] + float4(OFFSETRIGHTDOWN / length(OFFSETRIGHTDOWN), 0, 1) * 10;
-    VelocityFieldOUT[pos + OFFSETRIGHTUP] = VelocityFieldOUT[pos + OFFSETRIGHTUP] + float4(OFFSETRIGHTUP / length(OFFSETRIGHTUP), 0, 1) * 10;
+    VelocityFieldOUT[pos + OFFSETLEFTDOWN] = VelocityFieldOUT[pos + OFFSETLEFTDOWN] + float4(OFFSETLEFTDOWN / length(OFFSETLEFTDOWN), 0, 1) * finalScalar;
+    VelocityFieldOUT[pos + OFFSETLEFTUP] = VelocityFieldOUT[pos + OFFSETLEFTUP] + float4(OFFSETLEFTUP / length(OFFSETLEFTUP), 0, 1) * finalScalar;
+    VelocityFieldOUT[pos + OFFSETRIGHTDOWN] = VelocityFieldOUT[pos + OFFSETRIGHTDOWN] + float4(OFFSETRIGHTDOWN / length(OFFSETRIGHTDOWN), 0, 1) * finalScalar;
+    VelocityFieldOUT[pos + OFFSETRIGHTUP] = VelocityFieldOUT[pos + OFFSETRIGHTUP] + float4(OFFSETRIGHTUP / length(OFFSETRIGHTUP), 0, 1) * finalScalar;
 }
 
 [numthreads(8, 8, 1)]
@@ -207,20 +191,6 @@ void UpdateDensityAlongVelocityField(uint3 id : SV_DispatchThreadID)
     }
     
     DensityFieldOUT[id.xy] = outDen;
-    
-    //float scalar = DeltaTime * TextureSize * SpeedScalar;
-    //float2 offsetPos = id.xy - scalar * VelocityFieldIN[id.xy].xy;
-    //offsetPos = clamp(offsetPos, 0.5f, TextureSize + 0.5f);
-    //int2 offsetPosInt = int2(offsetPos);
-    
-    //float xPerc1 = offsetPos.x - offsetPosInt.x;
-    //float xPerc2 = 1 - xPerc1;
-    //float yPerc1 = offsetPos.y - offsetPosInt.y;
-    //float yPerc2 = 1 - yPerc1;
-    
-    //DensityFieldOUT[id.xy]
-    //    = xPerc2 * (yPerc2 * DensityFieldIN[offsetPosInt]               + yPerc1 * DensityFieldIN[offsetPosInt + int2(0, 1)])
-    //    + xPerc1 * (yPerc2 * DensityFieldIN[offsetPosInt + int2(1, 0)]  + yPerc1 * DensityFieldIN[offsetPosInt + int2(1, 1)]);
     
 }
 
@@ -317,7 +287,6 @@ void HandleCollision(uint3 id : SV_DispatchThreadID)
 
 int2 GetClampedCoord(int2 pos)
 {
-    //return min(TextureSize-1, max(pos, 0));
     return clamp(pos, 0, TextureSize - 1);
 }
 
