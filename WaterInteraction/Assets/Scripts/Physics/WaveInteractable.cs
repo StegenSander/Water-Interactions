@@ -8,7 +8,6 @@ namespace WaterInteraction
     public class WaveInteractable : MonoBehaviour
     {
         float _Volume = 1;
-        NavierStokesPropagation _WavePropagation;
         Rigidbody _Rigidbody;
         Collider _Collider;
         int _WaterLayerIndex;
@@ -19,7 +18,6 @@ namespace WaterInteraction
         // Start is called before the first frame update
         void Start()
         {
-            _WavePropagation = FindObjectOfType<NavierStokesPropagation>();
             _Rigidbody = GetComponent<Rigidbody>();
             _Collider = GetComponent<Collider>();
             _WaterLayerIndex = LayerMask.NameToLayer("CustomWater");

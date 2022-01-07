@@ -8,11 +8,8 @@ namespace WaterInteraction
     [RequireComponent(typeof(Camera))]
     public class CollisionRender : MonoBehaviour
     {
-        [SerializeField] SimulationData _SimData;
         [SerializeField] Material _DebugMat1;
         [SerializeField] Material _DebugMat2;
-
-        NavierStokesPropagation _WavePropagation;
 
         Camera _CollisionCamera;
         RenderTexture _CollisionTexture1;
@@ -40,21 +37,28 @@ namespace WaterInteraction
         void Start()
         {
             _CollisionCamera = GetComponent<Camera>();
-            CreateRenderTexture(ref _CollisionTexture1, _SimData.TextureSize);
-            CreateRenderTexture(ref _CollisionTexture2, _SimData.TextureSize);
+            CreateRenderTexture(ref _CollisionTexture1, SceneData.Instance.SimData.TextureSize);
+            CreateRenderTexture(ref _CollisionTexture2, SceneData.Instance.SimData.TextureSize);
 
-            _WavePropagation = FindObjectOfType<NavierStokesPropagation>();
-            _WavePropagation.DynamicCollisionNew = NewCollisionTexture;
-            _WavePropagation.DynamicCollisionOld = OldCollisionTexture;
+            _CollisionCamera.forceIntoRenderTexture = true;
+            _CollisionCamera.targetTexture = _CollisionTexture1;
 
+            if (SceneData.Instance.SimData.CollisionBaker == SimulationData.CollisionBakers.CameraBake)
+            {
+                var waveProp = SceneData.Instance.WavePropagation;
+                waveProp.DynamicCollisionNew = NewCollisionTexture;
+                waveProp.DynamicCollisionOld = OldCollisionTexture;
 
-            _DebugMat1.SetTexture("_BaseMap", _CollisionTexture1);
-            _DebugMat2.SetTexture("_BaseMap", _CollisionTexture2);
+                _DebugMat1.SetTexture("_BaseMap", _CollisionTexture1);
+                _DebugMat2.SetTexture("_BaseMap", _CollisionTexture2);
+            }
         }
 
         // Update is called once per frame
         void Update()
         {
+            if (SceneData.Instance.SimData.CollisionBaker != SimulationData.CollisionBakers.CameraBake) return;
+
             if (_Is1NewCollisionTexture)
             {
                 RenderCollision(_CollisionTexture1);
@@ -72,14 +76,14 @@ namespace WaterInteraction
             _CollisionCamera.forceIntoRenderTexture = true;
             _CollisionCamera.targetTexture = targetTexture;
 
-            _WavePropagation.DynamicCollisionNew = NewCollisionTexture;
-            _WavePropagation.DynamicCollisionOld = OldCollisionTexture;
+            SceneData.Instance.WavePropagation.DynamicCollisionNew = NewCollisionTexture;
+            SceneData.Instance.WavePropagation.DynamicCollisionOld = OldCollisionTexture;
         }
 
         void CreateRenderTexture(ref RenderTexture texture, int size)
         {
             texture = new RenderTexture(size, size, 0, RenderTextureFormat.RFloat, RenderTextureReadWrite.sRGB);
-            texture.filterMode = FilterMode.Point;
+            texture.filterMode = FilterMode.Bilinear;
             texture.name = "CollisionTexture (Generated)";
             texture.wrapMode = TextureWrapMode.Clamp;
             texture.enableRandomWrite = true;

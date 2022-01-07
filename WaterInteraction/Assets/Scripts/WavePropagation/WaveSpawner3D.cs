@@ -8,12 +8,9 @@ namespace WaterInteraction
     {
 
         [SerializeField] bool _UseClickToSpawnWaves = true;
-
-        NavierStokesPropagation _WavePropagation;
         // Start is called before the first frame update
         void Start()
         {
-            _WavePropagation = FindObjectOfType<NavierStokesPropagation>();
         }
 
         // Update is called once per frame
@@ -42,13 +39,13 @@ namespace WaterInteraction
                             hitPos = new Vector3(hitPos.x / (actualSize.x), 0, hitPos.z / (actualSize.z));
 
 
-                            _WavePropagation.SpawnWave(new Vector2(1 - hitPos.x, 1 - hitPos.z));
+                            SceneData.Instance.WavePropagation.SpawnWave(new Vector2(1 - hitPos.x, 1 - hitPos.z));
                             //Debug.Log("HitPos: " + hitPos);
 
                         }
                         else if (hit.collider.GetType() == typeof(MeshCollider))
                         {
-                            _WavePropagation.SpawnWave(hit.textureCoord);
+                            SceneData.Instance.WavePropagation.SpawnWave(hit.textureCoord);
                         }
                         else
                         {

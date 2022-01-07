@@ -1,5 +1,11 @@
 // Each #kernel tells which function to compile; you can have many kernels
 #pragma kernel FillTexture
+
+#pragma kernel CalculateTotalVolume
+#pragma kernel CalculateOldVolume
+#pragma kernel CalculateNewVolume
+#pragma kernel FixVolume
+
 #pragma kernel RenderHeightMap
 #pragma kernel HandleNewWaves
 #pragma kernel HandleSpawnWaves
@@ -13,6 +19,7 @@
 int2 GetClampedCoord(int2 pos);
 void DoesVelocityEndUpInCell(int2 startCell, float2 startCellVel, int2 targetCell, out float percX, out float percY);
 void SpawnWaveOnCell(uint2 pos, float scalar);
+float CalculateVolume();
 
 struct NewOccupiedWaveCell
 {
@@ -60,12 +67,59 @@ RWTexture2D<float4> TextureToFill;
 float DensityFreed;
 RWTexture2D<float2> SpawnWaveTexture;
 
+//Debug Total Volume
+float OldVolume;
+float NewVolume;
+RWStructuredBuffer<float> TotalVolume;
+
 
 [numthreads(8, 8, 1)]
 void FillTexture(uint3 id : SV_DispatchThreadID)
 {
     TextureToFill[id.xy] = TextureFillValue;
+}
+
+[numthreads(1, 1, 1)]
+void CalculateTotalVolume(uint3 id : SV_DispatchThreadID)
+{
+    TotalVolume[0] = CalculateVolume();
+}
+[numthreads(1, 1, 1)]
+void CalculateOldVolume(uint3 id : SV_DispatchThreadID)
+{
+    OldVolume = CalculateVolume();
+}
+[numthreads(1, 1, 1)]
+void CalculateNewVolume(uint3 id : SV_DispatchThreadID)
+{
+    NewVolume = CalculateVolume();
+}
+
+float CalculateVolume()
+{
+    float volume = 0;
+    uint width;
+    uint height;
+    DensityFieldIN.GetDimensions(width, height);
     
+    for (uint x = 0; x < width; x++)
+    {
+        for (uint y = 0; y < height; y++)
+        {
+            uint2 coord = uint2(x, y);
+            volume += DensityFieldIN[coord];
+        }
+    }
+    
+    return volume;
+}
+[numthreads(8, 8, 1)]
+void FixVolume(uint3 id : SV_DispatchThreadID)
+{
+    float diff = OldVolume - NewVolume;
+    float valuePerCell = diff / (TextureSize * TextureSize);
+    
+    DensityFieldOUT[id.xy] = DensityFieldIN[id.xy] + valuePerCell;
 }
 
 [numthreads(8, 8, 1)]
@@ -168,7 +222,7 @@ void DiffuseVelocity(uint3 id : SV_DispatchThreadID)
 void UpdateDensityAlongVelocityField(uint3 id : SV_DispatchThreadID)
 {
     float outDen = (float) 0;
-    const int range = 1;
+    const int range = 5;
     
     for (int x = -range; x <= range; x++)
     {
@@ -190,7 +244,7 @@ void UpdateDensityAlongVelocityField(uint3 id : SV_DispatchThreadID)
         }
     }
     
-    DensityFieldOUT[id.xy] = outDen;
+    DensityFieldOUT[id.xy] = clamp(outDen, 0, 1);
     
 }
 
@@ -198,7 +252,7 @@ void UpdateDensityAlongVelocityField(uint3 id : SV_DispatchThreadID)
 void UpdateVelocityAlongVelocityField(uint3 id : SV_DispatchThreadID)
 {
     float2 outVel = (float2)0;
-    const int range =1;
+    const int range = 5;
     
     for (int x = -range; x <= range; x++)
     {

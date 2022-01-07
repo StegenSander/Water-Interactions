@@ -10,13 +10,11 @@ namespace WaterInteraction
 
     public class WaveSpawner2D : MonoBehaviour
     {
-        NavierStokesPropagation _WavePropagation;
         [SerializeField] Image _TargetField;
         Rect _TargetArea;
         // Start is called before the first frame update
         void Start()
         {
-            _WavePropagation = FindObjectOfType<NavierStokesPropagation>();
             InitializeTargetField();
         }
 
@@ -42,8 +40,8 @@ namespace WaterInteraction
                 Debug.Log("worldTargetSize: " + worldTargetSize);
                 Vector2 normalizedTargetPosition = (worldOffset / worldTargetSize);
                 Debug.Log("normalizedTargetPosition: " + normalizedTargetPosition);
-                
-                _WavePropagation.SpawnWave(normalizedTargetPosition);
+
+                SceneData.Instance.WavePropagation.SpawnWave(normalizedTargetPosition);
             }
         }
     }

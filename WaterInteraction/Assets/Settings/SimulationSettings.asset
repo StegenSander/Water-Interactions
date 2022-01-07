@@ -12,4 +12,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1c8c80e168db8564093bddccb302e0c5, type: 3}
   m_Name: SimulationSettings
   m_EditorClassIdentifier: Assembly-CSharp::SpawnManagerScriptableObject
-  TextureSize: 32
+  TextureSize: 64
+  VertexHeightToBeSurface: 0.5
+  DefaultDensityValue: 0.5
+  FluidDensity: 1
+  CollisionBaker: 1

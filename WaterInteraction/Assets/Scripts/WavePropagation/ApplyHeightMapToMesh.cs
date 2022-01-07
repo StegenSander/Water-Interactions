@@ -2,93 +2,93 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class ApplyHeightMapToMesh : MonoBehaviour
+namespace WaterInteraction
 {
-    [SerializeField] SimulationData _SimData;
-    [SerializeField] Texture2D _CurrentHeightMap;
-    [SerializeField] float _MinVertexHeightToBeSurface = 0.5f;
-    [SerializeField] float _AverageWaterHeight;
-    [SerializeField] float _WaterHeightMaxOffset;
-
-    Renderer _Renderer;
-    MeshCollider _MeshCollider;
-    MeshFilter _MeshFilter;
-
-    [SerializeField] List<Vector3> _Vertices;
-    [SerializeField] List<Vector2> _UVS;
-    [SerializeField] List<int> _ImportantIndices;
-    // Start is called before the first frame update
-    void Start()
+    public class ApplyHeightMapToMesh : MonoBehaviour
     {
-        _CurrentHeightMap = new Texture2D(_SimData.TextureSize, _SimData.TextureSize, TextureFormat.RGBAFloat, false);
+        [SerializeField] Texture2D _CurrentHeightMap;
+        [SerializeField] float _MinVertexHeightToBeSurface = 0.5f;
+        [SerializeField] float _AverageWaterHeight;
+        [SerializeField] float _WaterHeightMaxOffset;
 
-        _Renderer = GetComponent<Renderer>();
-        _MeshCollider = GetComponent<MeshCollider>();
-        _MeshFilter = GetComponent<MeshFilter>();
-        PrepareMesh();
-    }
+        MeshCollider _MeshCollider;
+        MeshFilter _MeshFilter;
 
-    public void PrepareMesh()
-    {
-        Mesh mesh = _MeshFilter.mesh;
-        mesh.MarkDynamic();
-        _MeshFilter.mesh = mesh;
-
-        _Vertices = new List<Vector3>(mesh.vertices);
-        _UVS = new List<Vector2>(mesh.uv);
-        _ImportantIndices = new List<int>();
-
-        for (int i =0; i < _Vertices.Count; i ++)
+        [SerializeField] List<Vector3> _Vertices;
+        [SerializeField] List<Vector2> _UVS;
+        [SerializeField] List<int> _ImportantIndices;
+        // Start is called before the first frame update
+        void Start()
         {
-            if (_Vertices[i].z > _MinVertexHeightToBeSurface)
+            _CurrentHeightMap = new Texture2D(SceneData.Instance.SimData.TextureSize, SceneData.Instance.SimData.TextureSize, TextureFormat.RGBAFloat, false);
+
+            _MeshCollider = GetComponent<MeshCollider>();
+            _MeshFilter = GetComponent<MeshFilter>();
+            PrepareMesh();
+        }
+
+        public void PrepareMesh()
+        {
+            Mesh mesh = _MeshFilter.mesh;
+            mesh.MarkDynamic();
+            _MeshFilter.mesh = mesh;
+
+            _Vertices = new List<Vector3>(mesh.vertices);
+            _UVS = new List<Vector2>(mesh.uv);
+            _ImportantIndices = new List<int>();
+
+            for (int i = 0; i < _Vertices.Count; i++)
             {
-                _ImportantIndices.Add(i);
+                if (_Vertices[i].z > _MinVertexHeightToBeSurface)
+                {
+                    _ImportantIndices.Add(i);
+                }
             }
         }
-    }
 
-    public void SetHeightMap(RenderTexture tex)
-    {
-        RenderTextureToHeightMap(tex);
-        ApplyHeightMap();
-        SetMeshData();
-    }
-
-    public void RenderTextureToHeightMap(RenderTexture renderTex)
-    {
-        var old_rt = RenderTexture.active;
-        RenderTexture.active = renderTex;
-
-        _CurrentHeightMap.ReadPixels(new Rect(0, 0, renderTex.width, renderTex.height), 0, 0);
-        _CurrentHeightMap.Apply();
-
-        RenderTexture.active = old_rt;
-    }
-
-    public void ApplyHeightMap()
-    {
-        foreach (int vertexIndex in _ImportantIndices)
+        public void SetHeightMap(RenderTexture tex)
         {
-            float heightOffset = GetHeightFromHeightMap(_UVS[vertexIndex]) - 0.5f;
-            heightOffset *= _WaterHeightMaxOffset;
-
-            float height = _AverageWaterHeight + heightOffset;
-
-            Vector3 currentVertex = _Vertices[vertexIndex];
-            currentVertex.z = height;
-            _Vertices[vertexIndex] = currentVertex;
+            RenderTextureToHeightMap(tex);
+            ApplyHeightMap();
+            SetMeshData();
         }
-    }
 
-    void SetMeshData()
-    {
-        _MeshFilter.mesh.SetVertices(_Vertices);
-        _MeshCollider.sharedMesh = _MeshFilter.mesh;
-    }
+        public void RenderTextureToHeightMap(RenderTexture renderTex)
+        {
+            var old_rt = RenderTexture.active;
+            RenderTexture.active = renderTex;
 
-    float GetHeightFromHeightMap(Vector2 uv)
-    {
-        Color c =_CurrentHeightMap.GetPixel((int)(uv.x * _SimData.TextureSize), (int)(uv.y * _SimData.TextureSize));
-        return c.b;
+            _CurrentHeightMap.ReadPixels(new Rect(0, 0, renderTex.width, renderTex.height), 0, 0);
+            _CurrentHeightMap.Apply();
+
+            RenderTexture.active = old_rt;
+        }
+
+        public void ApplyHeightMap()
+        {
+            foreach (int vertexIndex in _ImportantIndices)
+            {
+                float heightOffset = GetHeightFromHeightMap(_UVS[vertexIndex]) - 0.5f;
+                heightOffset *= _WaterHeightMaxOffset;
+
+                float height = _AverageWaterHeight + heightOffset;
+
+                Vector3 currentVertex = _Vertices[vertexIndex];
+                currentVertex.z = height;
+                _Vertices[vertexIndex] = currentVertex;
+            }
+        }
+
+        void SetMeshData()
+        {
+            _MeshFilter.mesh.SetVertices(_Vertices);
+            _MeshCollider.sharedMesh = _MeshFilter.mesh;
+        }
+
+        float GetHeightFromHeightMap(Vector2 uv)
+        {
+            Color c = _CurrentHeightMap.GetPixel((int)(uv.x * SceneData.Instance.SimData.TextureSize), (int)(uv.y * SceneData.Instance.SimData.TextureSize));
+            return c.b;
+        }
     }
 }

@@ -4,23 +4,67 @@ using UnityEngine;
 
 namespace WaterInteraction
 {
-    public class SceneData : Singleton<SceneData>
+    public class SceneData : MonoBehaviour
     {
-        bool _IsInitialised = false;
+        #region Singleton
+        private static SceneData _Instance;
 
-        Camera _CollisionCamera = null;
-
-        void Initialize()
+        public static SceneData Instance
         {
-            _CollisionCamera = GameObject.FindGameObjectWithTag("CollisionCamera").GetComponent<Camera>();
-            _IsInitialised = true;
+            get
+            {
+                if (_Instance == null)
+                {
+                    _Instance = GameObject.FindObjectOfType<SceneData>();
+                }
+
+                return _Instance;
+            }
         }
 
-        public Camera GetCollisionCamera()
+        void Awake()
         {
-            if (!_IsInitialised) Initialize();
+            DontDestroyOnLoad(gameObject);
+        }
+        #endregion
 
-            return _CollisionCamera;
+        [SerializeField] SimulationData _SimData;
+        public SimulationData SimData
+        {
+            get { 
+                return _SimData; 
+            }
+        }
+
+        NavierStokesPropagation _WavePropagation;
+        public NavierStokesPropagation WavePropagation
+        {
+            get {
+                if (_WavePropagation == null)
+                    _WavePropagation = FindObjectOfType<NavierStokesPropagation>();
+                return _WavePropagation; 
+            }
+        }
+
+        CollisionBaker _CollisionBaker;
+        public CollisionBaker CollisionBaker
+        {
+            get {
+                if (_CollisionBaker == null)
+                    _CollisionBaker = FindObjectOfType<CollisionBaker>(); 
+                return _CollisionBaker; 
+            }
+        }
+
+        CollisionRender _CollisionRender;
+        public CollisionRender CollisionRender
+        {
+            get
+            {
+                if (_CollisionRender == null)
+                    _CollisionRender = FindObjectOfType<CollisionRender>(); 
+                return _CollisionRender; 
+            }
         }
     }
 }
