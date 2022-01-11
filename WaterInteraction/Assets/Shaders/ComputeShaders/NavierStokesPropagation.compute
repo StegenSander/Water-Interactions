@@ -8,10 +8,13 @@
 
 #pragma kernel RenderHeightMap
 #pragma kernel HandleNewWaves
-#pragma kernel HandleSpawnWaves
-#pragma kernel DiffuseDensity
-#pragma kernel DiffuseVelocity
-#pragma kernel HandleCollision;
+#pragma kernel HandleSpawnWavesCameraBaked
+#pragma kernel HandleSpawnWavesGridBaked
+
+#pragma kernel DiffuseTexture
+#pragma kernel DiffuseTextureNoClamp
+
+#pragma kernel HandleCollision
 #pragma kernel UpdateDensityAlongVelocityField;
 #pragma kernel UpdateVelocityAlongVelocityField
 
@@ -37,14 +40,19 @@ int DebugDraw;
 
 RWTexture2D<float4> TargetTexture;
 
+Texture2D<float4> DiffuseTextureIN;
+RWTexture2D<float4> DiffuseTextureOUT;
+
 Texture2D<float4> VelocityFieldIN;
 RWTexture2D<float4> VelocityFieldOUT;
 
 Texture2D<float> DensityFieldIN;
 RWTexture2D<float> DensityFieldOUT;
 
-Texture2D<float4> DynamicCollisionOld;
-Texture2D<float4> DynamicCollisionNew;
+Texture2D<float4> CameraCollisionMapOld;
+Texture2D<float4> CameraCollisionMapNew;
+
+Texture2D<float4> GridCollisionMap;
 
 Texture2D<float4> CollisionTexture;
 
@@ -123,9 +131,19 @@ void FixVolume(uint3 id : SV_DispatchThreadID)
 }
 
 [numthreads(8, 8, 1)]
-void HandleSpawnWaves(uint3 id : SV_DispatchThreadID)
+void HandleSpawnWavesCameraBaked(uint3 id : SV_DispatchThreadID)
 {
-    float diff = DynamicCollisionNew[id.xy] - DynamicCollisionOld[id.xy];
+    float diff = CameraCollisionMapNew[id.xy].x - CameraCollisionMapOld[id.xy].x;
+    
+    if (abs(diff) > 0.01f)
+        SpawnWaveOnCell(id.xy, diff);
+}
+
+[numthreads(8, 8, 1)]
+void HandleSpawnWavesGridBaked(uint3 id : SV_DispatchThreadID)
+{
+    float diff = GridCollisionMap[id.xy].x;
+    diff = diff * 2 - 1;
     
     if (abs(diff) > 0.1f)
         SpawnWaveOnCell(id.xy, diff);
@@ -166,7 +184,7 @@ void SpawnWaveOnCell(uint2 pos, float scalar)
 }
 
 [numthreads(8, 8, 1)]
-void DiffuseDensity(uint3 id : SV_DispatchThreadID)
+void DiffuseTexture(uint3 id : SV_DispatchThreadID)
 {
     const int2 OFFSETLEFT = int2(-1, 0);
     const int2 OFFSETRIGHT = int2(1, 0);
@@ -175,47 +193,34 @@ void DiffuseDensity(uint3 id : SV_DispatchThreadID)
     
     float scalar = DiffuseRate * DeltaTime * TextureSize * TextureSize;
     
-    float gainThisFrame 
-    = scalar 
-    * (DensityFieldIN[GetClampedCoord(id.xy + OFFSETLEFT)] 
-    + DensityFieldIN[GetClampedCoord(id.xy + OFFSETRIGHT)]
-    + DensityFieldIN[GetClampedCoord(id.xy + OFFSETUP)]
-    + DensityFieldIN[GetClampedCoord(id.xy + OFFSETDOWN)]);
+    float4 gainThisFrame
+    = scalar
+    * (DiffuseTextureIN[GetClampedCoord(id.xy + OFFSETLEFT)]
+    + DiffuseTextureIN[GetClampedCoord(id.xy + OFFSETRIGHT)]
+    + DiffuseTextureIN[GetClampedCoord(id.xy + OFFSETUP)]
+    + DiffuseTextureIN[GetClampedCoord(id.xy + OFFSETDOWN)]);
     
-    DensityFieldOUT[id.xy].x = (DensityFieldIN[id.xy].x + gainThisFrame) / (1 + 4 * scalar);
-
+    DiffuseTextureOUT[id.xy] = (DiffuseTextureIN[id.xy] + gainThisFrame) / (1 + 4 * scalar);
 }
 
 [numthreads(8, 8, 1)]
-void DiffuseVelocity(uint3 id : SV_DispatchThreadID)
+void DiffuseTextureNoClamp(uint3 id : SV_DispatchThreadID)
 {
     const int2 OFFSETLEFT = int2(-1, 0);
     const int2 OFFSETRIGHT = int2(1, 0);
     const int2 OFFSETUP = int2(0, 1);
     const int2 OFFSETDOWN = int2(0, -1);
     
-    const int2 OFFSETLEFTDOWN = int2(-1, -1);
-    const int2 OFFSETLEFTUP = int2(-1, 1);
-    const int2 OFFSETRIGHTDOWN = int2(1, -1);
-    const int2 OFFSETRIGHTUP = int2(1, 1);
+    float scalar = DiffuseRate * DeltaTime * TextureSize * TextureSize;
     
-    const float INVSQRT2 = 0.70710678118;
-    
-    float lossScalar = DiffuseRate * DeltaTime;
     float4 gainThisFrame
-    = lossScalar * (VelocityFieldIN[id.xy + OFFSETLEFT]
-    + VelocityFieldIN[id.xy + OFFSETRIGHT]
-    + VelocityFieldIN[id.xy + OFFSETUP]
-    + VelocityFieldIN[id.xy + OFFSETDOWN]);
+    = scalar
+    * (DiffuseTextureIN[id.xy + OFFSETLEFT]
+    + DiffuseTextureIN[id.xy + OFFSETRIGHT]
+    + DiffuseTextureIN[id.xy + OFFSETUP]
+    + DiffuseTextureIN[id.xy + OFFSETDOWN]);
     
-    +lossScalar  * INVSQRT2 * (VelocityFieldIN[id.xy + OFFSETLEFTDOWN]
-    + VelocityFieldIN[id.xy + OFFSETRIGHTDOWN]
-    + VelocityFieldIN[id.xy + OFFSETLEFTUP]
-    + VelocityFieldIN[id.xy + OFFSETRIGHTUP]);
-    
-    VelocityFieldOUT[id.xy] = (VelocityFieldIN[id.xy] + gainThisFrame) / (1 + 4 * lossScalar + 4 * lossScalar  * INVSQRT2);
-    VelocityFieldOUT[id.xy] = clamp(VelocityFieldOUT[id.xy], -1, 1);
-
+    DiffuseTextureOUT[id.xy] = (DiffuseTextureIN[id.xy] + gainThisFrame) / (1 + 4 * scalar);
 }
 
 [numthreads(8, 8, 1)]

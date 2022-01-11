@@ -72,6 +72,51 @@ namespace WaterInteraction
         }
         #endregion
 
+        #region CollisionCalculations
+        static public void CalculateWaterCollisionPoints(int amountOfSamplesPerMeter,float minDistanceBetweenPoint, Collider col,ref List<Vector3> OUTCollisionPoints)
+        {
+            //if (col.GetType() == typeof(BoxCollider)) //Optimasation possible fir every specific collider type
+            //{
+
+            //}
+            //else //Default should work for every collider
+            {
+                Bounds bounds = col.bounds;
+                float sampleSize = 1f / amountOfSamplesPerMeter;
+                Vector3 sampleCount = new Vector3(amountOfSamplesPerMeter * bounds.size.x
+                    , amountOfSamplesPerMeter * bounds.size.y
+                    , amountOfSamplesPerMeter * bounds.size.z);
+
+                Debug.Log(bounds);
+
+
+                List<Vector3> tempPoints = new List<Vector3>(Mathf.RoundToInt(sampleCount.x * sampleCount.y * sampleCount.z/2));
+
+                for (int x = 0; x < sampleCount.x; x++)
+                {
+                    for (int y = 0; y < sampleCount.y; y++)
+                    {
+                        for (int z = 0; z < sampleCount.z; z++)
+                        {
+                            Vector3 worldBoundPos = bounds.min + sampleSize * new Vector3(x, y, z);
+                            Vector3 closestPos = col.ClosestPoint(worldBoundPos);
+
+                            if (closestPos != worldBoundPos) //If it's not the original point it means that the position got clamped to the collider
+                            {
+                                if (!OUTCollisionPoints.Exists(
+                                    vec => (vec - closestPos).sqrMagnitude < minDistanceBetweenPoint * minDistanceBetweenPoint)
+                                    )
+                                {
+                                    OUTCollisionPoints.Add(closestPos);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        #endregion
+
         #region MathHelpers
         static public Bounds GetOverlappingBounds(Bounds lhs, Bounds bounds)
         {

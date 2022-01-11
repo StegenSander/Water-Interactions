@@ -125,3 +125,5 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 85fbc59e453c89e459827a56e40f7211, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  _CollisionSamplesPerMeter: 5
+  _MinDistanceBetweenCollisionPoints: 0.8

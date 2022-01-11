@@ -46,8 +46,8 @@ namespace WaterInteraction
             if (SceneData.Instance.SimData.CollisionBaker == SimulationData.CollisionBakers.CameraBake)
             {
                 var waveProp = SceneData.Instance.WavePropagation;
-                waveProp.DynamicCollisionNew = NewCollisionTexture;
-                waveProp.DynamicCollisionOld = OldCollisionTexture;
+                waveProp.CameraCollisionMapNew = NewCollisionTexture;
+                waveProp.CameraCollisionMapOld = OldCollisionTexture;
 
                 _DebugMat1.SetTexture("_BaseMap", _CollisionTexture1);
                 _DebugMat2.SetTexture("_BaseMap", _CollisionTexture2);
@@ -76,8 +76,8 @@ namespace WaterInteraction
             _CollisionCamera.forceIntoRenderTexture = true;
             _CollisionCamera.targetTexture = targetTexture;
 
-            SceneData.Instance.WavePropagation.DynamicCollisionNew = NewCollisionTexture;
-            SceneData.Instance.WavePropagation.DynamicCollisionOld = OldCollisionTexture;
+            SceneData.Instance.WavePropagation.CameraCollisionMapNew = NewCollisionTexture;
+            SceneData.Instance.WavePropagation.CameraCollisionMapOld = OldCollisionTexture;
         }
 
         void CreateRenderTexture(ref RenderTexture texture, int size)

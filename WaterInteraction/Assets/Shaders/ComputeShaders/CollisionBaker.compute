@@ -7,7 +7,8 @@ uint Get3DBufferCell(int3 pos);
 float3 ConvertHeightMapPosToGridSpace(float x, float height, float z);
 float SampleGridValue(float3 gridSpacePos);
 
-RWStructuredBuffer<float> CollisionGrid;
+RWStructuredBuffer<float> CollisionGridOld;
+RWStructuredBuffer<float> CollisionGridNew;
 
 Texture2D<float4> HeightMap;
 RWTexture2D<float> CollisionMap;
@@ -25,8 +26,8 @@ void BakeCollisionMap (uint3 id : SV_DispatchThreadID)
     float height = HeightMap[id.xy].b;
     float3 gridSpacePos = ConvertHeightMapPosToGridSpace(id.x, height, id.y);
     
-    
-    CollisionMap[id.xy] = SampleGridValue(gridSpacePos);
+    //CollisionMap[id.xy] = SampleGridValue(gridSpacePos);
+    CollisionMap[id.xy] = (SampleGridValue(gridSpacePos) + 1) / 2;
 }
 
 float3 ConvertHeightMapPosToGridSpace(float x, float height, float z)
@@ -41,15 +42,24 @@ float SampleGridValue(float3 gridSpacePos)
     float3 perc = gridSpacePos - gridSpacePosInt;
     
     float result = 0;
-    result += (1 - perc.x)  * (1 - perc.y)  * (1 - perc.z)  * CollisionGrid[Get3DBufferCell(gridSpacePosInt + int3(0, 0, 0))];
-    result += (perc.x)      * (1 - perc.y)  * (1 - perc.z)  * CollisionGrid[Get3DBufferCell(gridSpacePosInt + int3(1, 0, 0))];
-    result += (1 - perc.x)  * (perc.y)      * (1 - perc.z)  * CollisionGrid[Get3DBufferCell(gridSpacePosInt + int3(0, 1, 0))];
-    result += (perc.x)       * (perc.y)     * (1 - perc.z)  * CollisionGrid[Get3DBufferCell(gridSpacePosInt + int3(1, 1, 0))];
     
-    result += (1 - perc.x)  * (1 - perc.y)  * (perc.z)      * CollisionGrid[Get3DBufferCell(gridSpacePosInt + int3(0, 0, 1))];
-    result += (perc.x)      * (1 - perc.y)  * (perc.z)      * CollisionGrid[Get3DBufferCell(gridSpacePosInt + int3(1, 0, 1))];
-    result += (1 - perc.x)  * (perc.y)      * (perc.z)      * CollisionGrid[Get3DBufferCell(gridSpacePosInt + int3(0, 1, 1))];
-    result += (perc.x)      * (perc.y)      * (perc.z)      * CollisionGrid[Get3DBufferCell(gridSpacePosInt + int3(1, 1, 1))];
+    uint cellPos = Get3DBufferCell(gridSpacePosInt + int3(0, 0, 0));
+    result += (1 - perc.x) * (1 - perc.y) * (1 - perc.z) * (CollisionGridNew[cellPos] - CollisionGridOld[cellPos]);
+    cellPos = Get3DBufferCell(gridSpacePosInt + +int3(1, 0, 0));
+    result += (perc.x) * (1 - perc.y) * (1 - perc.z) * (CollisionGridNew[cellPos] - CollisionGridOld[cellPos]);
+    cellPos = Get3DBufferCell(gridSpacePosInt + int3(0, 1, 0));
+    result += (1 - perc.x) * (perc.y) * (1 - perc.z) * (CollisionGridNew[cellPos] - CollisionGridOld[cellPos]);
+    cellPos = Get3DBufferCell(gridSpacePosInt + int3(1, 1, 0));
+    result += (perc.x) * (perc.y) * (1 - perc.z) * (CollisionGridNew[cellPos] - CollisionGridOld[cellPos]);
+    
+    cellPos = Get3DBufferCell(gridSpacePosInt + int3(0, 0, 1));
+    result += (1 - perc.x) * (1 - perc.y) * (perc.z) * (CollisionGridNew[cellPos] - CollisionGridOld[cellPos]);
+    cellPos = Get3DBufferCell(gridSpacePosInt + int3(1, 0, 1));
+    result += (perc.x) * (1 - perc.y) * (perc.z) * (CollisionGridNew[cellPos] - CollisionGridOld[cellPos]);
+    cellPos = Get3DBufferCell(gridSpacePosInt + int3(0, 1, 1));
+    result += (1 - perc.x) * (perc.y) * (perc.z) * (CollisionGridNew[cellPos] - CollisionGridOld[cellPos]);
+    cellPos = Get3DBufferCell(gridSpacePosInt + int3(1, 1, 1));
+    result += (perc.x) * (perc.y) * (perc.z) * (CollisionGridNew[cellPos] - CollisionGridOld[cellPos]);
     
     //return CollisionGrid[Get3DBufferCell(gridSpacePosInt + int3(0, 0, 0))];
     return result;

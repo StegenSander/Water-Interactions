@@ -13,32 +13,22 @@ namespace WaterInteraction
         [Header("Core Values")]
         [SerializeField] ComputeShader _CollisionBakerShader;
         [SerializeField] Vector3Int _AmountOfGridCells;
+        [SerializeField] float _MaxSpeed;
 
         [Header("Debug Values")]
         [SerializeField] bool _DrawGrid =true;
         Vector3 _GridCellSize;
 
-        ComputeBuffer _GridBuffer;
+        ComputeBuffer _GridBufferOld;
+        ComputeBuffer _GridBufferNew;
 
         #region CollisionTexture
-        RenderTexture _CollisionTexture1;
-        RenderTexture _CollisionTexture2;
-        bool _Is1NewCollisionTexture = true;
-        public RenderTexture NewCollisionTexture
+        RenderTexture _CollisionTexture;
+        public RenderTexture CollisionTexture
         {
             get
             {
-                if (_Is1NewCollisionTexture) return _CollisionTexture1;
-                else return _CollisionTexture2;
-            }
-        }
-
-        public RenderTexture OldCollisionTexture
-        {
-            get
-            {
-                if (!_Is1NewCollisionTexture) return _CollisionTexture1;
-                else return _CollisionTexture2;
+                return _CollisionTexture;
             }
         }
         #endregion
@@ -47,38 +37,40 @@ namespace WaterInteraction
         int _KernelBakeCollisionMap;
         #endregion
 
+
         Bounds _GridBounds = new Bounds();
-        float[,,] _CollisionGrid;
+        bool _Is1NewCollisionGrid = true;
+        float[,,] _CollisionGrid1;
+        float[,,] _CollisionGrid2;
 
         private void Start()
         {
             InitializeGrid();
             InitializeComputeBuffers();
             InitializeKernels();
-            InitializeRenderTexture(ref _CollisionTexture1, SceneData.Instance.SimData.TextureSize);
-            InitializeRenderTexture(ref _CollisionTexture2, SceneData.Instance.SimData.TextureSize);
+            InitializeRenderTexture(ref _CollisionTexture, SceneData.Instance.SimData.TextureSize);
 
 
             if (SceneData.Instance.SimData.CollisionBaker == SimulationData.CollisionBakers.GridBake)
             {
                 var waveProp = SceneData.Instance.WavePropagation;
-                waveProp.DynamicCollisionNew = NewCollisionTexture;
-                waveProp.DynamicCollisionOld = OldCollisionTexture;
+                waveProp.CameraCollisionMapNew = CollisionTexture;
 
-                _DebugMat1.SetTexture("_BaseMap", _CollisionTexture1);
-                _DebugMat2.SetTexture("_BaseMap", _CollisionTexture2);
+                _DebugMat1.SetTexture("_BaseMap", _CollisionTexture);
             }
         }
 
         private void OnDestroy()
         {
-            _GridBuffer.Dispose();
+            _GridBufferOld.Dispose();
+            _GridBufferNew.Dispose();
         }
 
         #region Initialize
         void InitializeGrid()
         {
-            _CollisionGrid = new float[_AmountOfGridCells.x + 1, _AmountOfGridCells.y + 1, _AmountOfGridCells.z + 1];
+            _CollisionGrid1 = new float[_AmountOfGridCells.x + 1, _AmountOfGridCells.y + 1, _AmountOfGridCells.z + 1];
+            _CollisionGrid2 = new float[_AmountOfGridCells.x + 1, _AmountOfGridCells.y + 1, _AmountOfGridCells.z + 1];
 
             BoxCollider col = GetComponent<BoxCollider>();
             Vector3 gridSize = col.size;
@@ -94,7 +86,8 @@ namespace WaterInteraction
 
         void InitializeComputeBuffers()
         {
-            _GridBuffer = new ComputeBuffer(_CollisionGrid.Length, sizeof(float));
+            _GridBufferOld = new ComputeBuffer(_CollisionGrid1.Length, sizeof(float));
+            _GridBufferNew = new ComputeBuffer(_CollisionGrid2.Length, sizeof(float));
         }
 
         void InitializeKernels()
@@ -117,10 +110,21 @@ namespace WaterInteraction
         {
             if (SceneData.Instance.SimData.CollisionBaker != SimulationData.CollisionBakers.GridBake) return;
 
-            if (_DrawGrid) DrawGrid();
+
+            if (_DrawGrid)
+            {
+                if (_Is1NewCollisionGrid)
+                {
+                    DrawGrid(_CollisionGrid1);
+                }
+                else
+                {
+                    DrawGrid(_CollisionGrid2);
+                }
+            }
         }
 
-        private void DrawGrid()
+        private void DrawGrid(in float[,,] grid)
         {
             for (int x = 0; x < _AmountOfGridCells.x + 1; x++)
             {
@@ -130,7 +134,7 @@ namespace WaterInteraction
                     {
                         Vector3 temp = new Vector3(_GridCellSize.x * x, _GridCellSize.y * y, _GridCellSize.z * z);
                         Vector3 worldPos = _GridBounds.min + temp;
-                        Debug.DrawLine(worldPos, worldPos + Vector3.up / 10, new Color(_CollisionGrid[x, y, z], 0, 0));
+                        Debug.DrawLine(worldPos, worldPos + Vector3.up / 10, new Color(grid[x, y, z], 0, 0));
                     }
                 }
             }
@@ -141,23 +145,39 @@ namespace WaterInteraction
             if (SceneData.Instance.SimData.CollisionBaker != SimulationData.CollisionBakers.GridBake) return;
 
             BakeTexture();
-            SceneData.Instance.WavePropagation.DynamicCollisionNew = NewCollisionTexture;
-            SceneData.Instance.WavePropagation.DynamicCollisionOld = OldCollisionTexture;
-            _Is1NewCollisionTexture = !_Is1NewCollisionTexture;
+            _Is1NewCollisionGrid = !_Is1NewCollisionGrid;
+            SceneData.Instance.WavePropagation.GridCollisionMap = CollisionTexture;
 
-            ClearGrid();
+            if (_Is1NewCollisionGrid)
+            {
+                ClearGrid(ref _CollisionGrid1);
+            }
+            else
+            {
+                ClearGrid(ref _CollisionGrid2);
+            }
         }
 
         private void OnTriggerStay(Collider other)
         {
             if (SceneData.Instance.SimData.CollisionBaker != SimulationData.CollisionBakers.GridBake) return;
-
-            AddColliderToGrid(other);
-            Debug.Log(other);
+            if (_Is1NewCollisionGrid)
+            {
+                AddColliderToGrid(other, ref _CollisionGrid1);
+            }
+            else
+            {
+                AddColliderToGrid(other, ref _CollisionGrid2);
+            }
+            //Debug.Log(other);
         }
 
-        public void AddColliderToGrid(Collider col)
+        public void AddColliderToGrid(Collider col, ref float[,,] grid)
         {
+            float vel = col.attachedRigidbody.velocity.magnitude;
+            vel /= _MaxSpeed;
+            Mathf.Min(vel, 1f);
+
             Bounds bounds = col.bounds;
             
             Vector3 min = PhysicsHelpers.Vector3Max(bounds.min, _GridBounds.min);
@@ -166,7 +186,8 @@ namespace WaterInteraction
             Bounds overlappingBounds = new Bounds();
             overlappingBounds.SetMinMax(min, max);
 
-            //Can Cause rounding issues, if wave are ever offset, this will be the issue
+            WaveInteractable waveInteractable = col.gameObject.GetComponent<WaveInteractable>();
+
             for (float x = overlappingBounds.min.x; x < overlappingBounds.max.x; x += _GridCellSize.x)
             {
                 for (float y = overlappingBounds.min.y; y < overlappingBounds.max.y; y += _GridCellSize.y)
@@ -177,28 +198,37 @@ namespace WaterInteraction
                         Vector3Int gridPos = WorldPosToGridCell(worldPos);
                         if (col.ClosestPoint(worldPos) == worldPos)
                         {
-                            _CollisionGrid[gridPos.x, gridPos.y, gridPos.z] = 1f;
+                            grid[gridPos.x, gridPos.y, gridPos.z] = vel;
                         }
                     }
                 }
             }
         }
 
+        private void HandleCollisionInPoint(WaveInteractable waveInteractable, Vector3 worldPos)
+        {
+            float volumeOfOneGridCell = _GridCellSize.x * _GridCellSize.y * _GridCellSize.z;
+            waveInteractable.ApplyForce(worldPos, volumeOfOneGridCell);
+        }
+
         public void BakeTexture()
         {
             int textureSize = SceneData.Instance.SimData.TextureSize;
-            _GridBuffer.SetData(_CollisionGrid);
-            _CollisionBakerShader.SetBuffer(_KernelBakeCollisionMap, "CollisionGrid", _GridBuffer);
-            _CollisionBakerShader.SetTexture(_KernelBakeCollisionMap, "HeightMap", SceneData.Instance.WavePropagation.HeightMap);
-
-            if (_Is1NewCollisionTexture)
+            if (_Is1NewCollisionGrid)
             {
-                _CollisionBakerShader.SetTexture(_KernelBakeCollisionMap, "CollisionMap", _CollisionTexture1);
+                _GridBufferNew.SetData(_CollisionGrid1);
+                _GridBufferOld.SetData(_CollisionGrid2);
             }
             else
             {
-                _CollisionBakerShader.SetTexture(_KernelBakeCollisionMap, "CollisionMap", _CollisionTexture2);
+                _GridBufferNew.SetData(_CollisionGrid2);
+                _GridBufferOld.SetData(_CollisionGrid1);
             }
+            _CollisionBakerShader.SetBuffer(_KernelBakeCollisionMap, "CollisionGridNew", _GridBufferNew);
+            _CollisionBakerShader.SetBuffer(_KernelBakeCollisionMap, "CollisionGridOld", _GridBufferOld);
+            _CollisionBakerShader.SetTexture(_KernelBakeCollisionMap, "HeightMap", SceneData.Instance.WavePropagation.HeightMap);
+
+            _CollisionBakerShader.SetTexture(_KernelBakeCollisionMap, "CollisionMap", _CollisionTexture);
 
             _CollisionBakerShader.SetVector("AmountOfGridCells", (Vector3)_AmountOfGridCells);
             _CollisionBakerShader.SetVector("GridPos", _GridBounds.min);
@@ -208,7 +238,7 @@ namespace WaterInteraction
             _CollisionBakerShader.SetInt("TextureSize", textureSize);
             _CollisionBakerShader.Dispatch(_KernelBakeCollisionMap, textureSize / 8, textureSize / 8, 1);
         }
-        public void ClearGrid()
+        public void ClearGrid(ref float[,,] grid)
         {
             for (int x = 0; x < _AmountOfGridCells.x +1; x++)
             {
@@ -216,7 +246,7 @@ namespace WaterInteraction
                 {
                     for (int z = 0; z < _AmountOfGridCells.z +1; z++)
                     {
-                        _CollisionGrid[x, y, z] = 0f;
+                        grid[x, y, z] = 0f;
                     }
                 }
             }

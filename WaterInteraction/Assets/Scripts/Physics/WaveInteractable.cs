@@ -1,12 +1,19 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Profiling;
 
 namespace WaterInteraction
 {
     [RequireComponent(typeof(Rigidbody))] [RequireComponent(typeof(Collider))]
     public class WaveInteractable : MonoBehaviour
     {
+        [SerializeField] int _CollisionSamplesPerMeter = 5;
+        [SerializeField] float _MinDistanceBetweenCollisionPoints;
+
+        int _AmountOfCollisionPoints;
+        List<Transform> _CollisionPoints;
+
         float _Volume = 1;
         Rigidbody _Rigidbody;
         Collider _Collider;
@@ -14,6 +21,7 @@ namespace WaterInteraction
 
         bool _isInWater;
         Collider _CurrentBodyOfWater;
+        WaterForceHandler _CurrentWaterForceHandler;
 
         // Start is called before the first frame update
         void Start()
@@ -24,11 +32,19 @@ namespace WaterInteraction
 
             MeshFilter meshFilter = GetComponent<MeshFilter>();
             _Volume = VolumeCalcManager.Instance.GetVolume(meshFilter.mesh, transform.localScale);
-        }
 
-        // Update is called once per frame
-        void Update()
-        {
+            List<Vector3> points = new List<Vector3>();
+            PhysicsHelpers.CalculateWaterCollisionPoints(10, _MinDistanceBetweenCollisionPoints, _Collider, ref points);
+            _AmountOfCollisionPoints = Mathf.Max(points.Count, 1);
+            _CollisionPoints = new List<Transform>(_AmountOfCollisionPoints);
+
+            GameObject obj = new GameObject();
+            foreach (Vector3 pos in points)
+            {
+                GameObject collisionPointObject = Instantiate(obj, pos, Quaternion.identity, transform);
+                _CollisionPoints.Add(collisionPointObject.transform);
+            }
+            Destroy(obj);
         }
 
         /// <summary>
@@ -47,12 +63,19 @@ namespace WaterInteraction
 
         private void FixedUpdate()
         {
-            if (_isInWater)
+            if (!_CurrentWaterForceHandler) return;
+
+            Profiler.BeginSample("ApplyingForceToObject");
+            foreach (Transform t in _CollisionPoints)
             {
-                float volumePerc = GetPercentageBoundingBoxInWater(_CurrentBodyOfWater.bounds);
-                Vector3 force = Vector3.up * PhysicsHelpers.CalculateFluidForce(volumePerc * _Volume);
-                _Rigidbody.AddForce(force, ForceMode.Force);
+                if (_CurrentWaterForceHandler.GetPosToSurfaceOffset(t.position, out float offset))
+                {
+                    float volumePerc = 1f / _AmountOfCollisionPoints;
+                    Vector3 force = Vector3.up * PhysicsHelpers.CalculateFluidForce(_Volume* volumePerc);
+                    _Rigidbody.AddForceAtPosition(force, t.position, ForceMode.Force);
+                }
             }
+            Profiler.EndSample();
         }
 
         private void OnTriggerEnter(Collider other)
@@ -61,15 +84,24 @@ namespace WaterInteraction
             {
                 _isInWater = true;
                 _CurrentBodyOfWater = other;
+                _CurrentWaterForceHandler = other.gameObject.GetComponent<WaterForceHandler>();
             }
         }
+
         private void OnTriggerExit(Collider other)
         {
             if (other.gameObject.layer == _WaterLayerIndex)
             {
                 _isInWater = false;
                 _CurrentBodyOfWater = null;
+                _CurrentWaterForceHandler = null;
             }
+        }
+
+        public void ApplyForce(Vector3 worldPosition, float volume)
+        {
+            Vector3 force = Vector3.up * PhysicsHelpers.CalculateFluidForce(volume);
+            _Rigidbody.AddForceAtPosition(force, worldPosition, ForceMode.Force);
         }
     }
 }
