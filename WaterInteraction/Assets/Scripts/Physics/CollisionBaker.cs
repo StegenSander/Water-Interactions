@@ -31,10 +31,20 @@ namespace WaterInteraction
                 return _CollisionTexture;
             }
         }
+
+        RenderTexture _VelocityTexture;
+        public RenderTexture VelocityTexture
+        {
+            get
+            {
+                return _VelocityTexture;
+            }
+        }
         #endregion
 
         #region Kernels
         int _KernelBakeCollisionMap;
+        int _KernelBakeVelocityMap;
         #endregion
 
 
@@ -48,7 +58,8 @@ namespace WaterInteraction
             InitializeGrid();
             InitializeComputeBuffers();
             InitializeKernels();
-            InitializeRenderTexture(ref _CollisionTexture, SceneData.Instance.SimData.TextureSize);
+            InitializeRenderTexture(ref _CollisionTexture, SceneData.Instance.SimData.TextureSize, RenderTextureFormat.RFloat);
+            InitializeRenderTexture(ref _VelocityTexture, SceneData.Instance.SimData.TextureSize, RenderTextureFormat.RGFloat);
 
 
             if (SceneData.Instance.SimData.CollisionBaker == SimulationData.CollisionBakers.GridBake)
@@ -74,7 +85,7 @@ namespace WaterInteraction
 
             BoxCollider col = GetComponent<BoxCollider>();
             Vector3 gridSize = col.size;
-            gridSize.Scale(transform.localScale);
+            gridSize.Scale(transform.lossyScale);
             Vector3 gridBottomLeftPos = (transform.position + col.center) - gridSize / 2;
 
             _GridBounds.SetMinMax(gridBottomLeftPos, gridBottomLeftPos + gridSize);
@@ -93,11 +104,12 @@ namespace WaterInteraction
         void InitializeKernels()
         {
             _KernelBakeCollisionMap = _CollisionBakerShader.FindKernel("BakeCollisionMap");
+            _KernelBakeVelocityMap = _CollisionBakerShader.FindKernel("BakeVelocityMap");
         }
 
-        void InitializeRenderTexture(ref RenderTexture texture, int size)
+        void InitializeRenderTexture(ref RenderTexture texture, int size, RenderTextureFormat format)
         {
-            texture = new RenderTexture(size,size, 0, RenderTextureFormat.RFloat, RenderTextureReadWrite.sRGB);
+            texture = new RenderTexture(size,size, 0, format, RenderTextureReadWrite.sRGB);
             texture.filterMode = FilterMode.Point;
             texture.name = "TargetTexture (Generated)";
             texture.wrapMode = TextureWrapMode.Repeat;
@@ -144,9 +156,11 @@ namespace WaterInteraction
         {
             if (SceneData.Instance.SimData.CollisionBaker != SimulationData.CollisionBakers.GridBake) return;
 
-            BakeTexture();
+            BakeCollision();
             _Is1NewCollisionGrid = !_Is1NewCollisionGrid;
-            SceneData.Instance.WavePropagation.GridCollisionMap = CollisionTexture;
+
+            BakeVelocityMap();
+            SceneData.Instance.WavePropagation.NewVelocityMap = VelocityTexture;
 
             if (_Is1NewCollisionGrid)
             {
@@ -211,7 +225,7 @@ namespace WaterInteraction
             waveInteractable.ApplyForce(worldPos, volumeOfOneGridCell);
         }
 
-        public void BakeTexture()
+        public void BakeCollision()
         {
             int textureSize = SceneData.Instance.SimData.TextureSize;
             if (_Is1NewCollisionGrid)
@@ -238,6 +252,16 @@ namespace WaterInteraction
             _CollisionBakerShader.SetInt("TextureSize", textureSize);
             _CollisionBakerShader.Dispatch(_KernelBakeCollisionMap, textureSize / 8, textureSize / 8, 1);
         }
+        public void BakeVelocityMap()
+        {
+            _CollisionBakerShader.SetTexture(_KernelBakeVelocityMap, "CollisionMap", _CollisionTexture);
+            _CollisionBakerShader.SetTexture(_KernelBakeVelocityMap, "VelocityMap", _VelocityTexture);
+
+            int textureSize = SceneData.Instance.SimData.TextureSize;
+            _CollisionBakerShader.SetInt("TextureSize", textureSize);
+            _CollisionBakerShader.Dispatch(_KernelBakeVelocityMap, textureSize / 8, textureSize / 8, 1);
+        }
+
         public void ClearGrid(ref float[,,] grid)
         {
             for (int x = 0; x < _AmountOfGridCells.x +1; x++)

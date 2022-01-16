@@ -1,17 +1,20 @@
 // Each #kernel tells which function to compile; you can have many kernels
 #pragma kernel BakeCollisionMap
+#pragma kernel BakeVelocityMap
 
 //Functions
 uint Get3DBufferCell(uint x, uint y, uint z);
 uint Get3DBufferCell(int3 pos);
 float3 ConvertHeightMapPosToGridSpace(float x, float height, float z);
 float SampleGridValue(float3 gridSpacePos);
+float GetClampedValue(int2 pos);
 
 RWStructuredBuffer<float> CollisionGridOld;
 RWStructuredBuffer<float> CollisionGridNew;
 
 Texture2D<float4> HeightMap;
 RWTexture2D<float> CollisionMap;
+RWTexture2D<float2> VelocityMap;
 
 float3 AmountOfGridCells;
 float3 GridPos; //minX,minY,minZ
@@ -28,6 +31,46 @@ void BakeCollisionMap (uint3 id : SV_DispatchThreadID)
     
     //CollisionMap[id.xy] = SampleGridValue(gridSpacePos);
     CollisionMap[id.xy] = (SampleGridValue(gridSpacePos) + 1) / 2;
+}
+
+[numthreads(8,8,1)]
+void BakeVelocityMap(uint3 id : SV_DispatchThreadID)
+{
+    const int2 OFFSETLEFT = int2(-1, 0);
+    const int2 OFFSETRIGHT = int2(1, 0);
+    const int2 OFFSETUP = int2(0, 1);
+    const int2 OFFSETDOWN = int2(0, -1);
+    
+    
+    const int2 OFFSETLEFTDOWN = int2(-1, -1);
+    const int2 OFFSETLEFTUP = int2(-1, 1);
+    const int2 OFFSETRIGHTDOWN = int2(1, -1);
+    const int2 OFFSETRIGHTUP = int2(1, 1);
+    
+    const float scalar = 1 / sqrt(2);
+    
+    float2 Vel =
+        (GetClampedValue(id.xy + OFFSETLEFT) * 2 - 1) * float2(-OFFSETLEFT)
+        + (GetClampedValue(id.xy + OFFSETRIGHT) * 2 - 1) * float2(-OFFSETRIGHT)
+        + (GetClampedValue(id.xy + OFFSETUP) * 2 - 1) * float2(-OFFSETUP)
+        + (GetClampedValue(id.xy + OFFSETDOWN) * 2 - 1) * float2(-OFFSETDOWN)
+    
+        + scalar * (
+        +(GetClampedValue(id.xy + OFFSETLEFTDOWN) * 2 - 1) * float2(-OFFSETLEFTDOWN)
+        + (GetClampedValue(id.xy + OFFSETLEFTUP) * 2 - 1) * float2(-OFFSETLEFTUP)
+        + (GetClampedValue(id.xy + OFFSETRIGHTDOWN) * 2 - 1) * float2(-OFFSETRIGHTDOWN)
+        + (GetClampedValue(id.xy + OFFSETRIGHTUP) * 2 - 1) * float2(-OFFSETRIGHTUP));
+    
+    VelocityMap[id.xy] = Vel;
+}
+
+float GetClampedValue(int2 pos)
+{
+    int2 clampedPos = clamp(pos, 0, TextureSize - 1);
+    if (clampedPos.x == pos.x && clampedPos.y == pos.y)
+        return CollisionMap[pos.xy];
+    
+    return 0.5f;
 }
 
 float3 ConvertHeightMapPosToGridSpace(float x, float height, float z)

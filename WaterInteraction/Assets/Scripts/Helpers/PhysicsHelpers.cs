@@ -75,11 +75,20 @@ namespace WaterInteraction
         #region CollisionCalculations
         static public void CalculateWaterCollisionPoints(int amountOfSamplesPerMeter,float minDistanceBetweenPoint, Collider col,ref List<Vector3> OUTCollisionPoints)
         {
-            //if (col.GetType() == typeof(BoxCollider)) //Optimasation possible fir every specific collider type
-            //{
-
-            //}
+            // if (col.GetType() == typeof(BoxCollider)) //Optimasation possible fir every specific collider type
+            // {
+            //     Bounds bounds = col.bounds;
+            //     OUTCollisionPoints.Add(new Vector3(bounds.min.x, bounds.min.y, bounds.min.z));
+            //     OUTCollisionPoints.Add(new Vector3(bounds.min.x + bounds.size.x, bounds.min.y, bounds.min.z));
+            //     OUTCollisionPoints.Add(new Vector3(bounds.min.x + bounds.size.x, bounds.min.y + bounds.size.y, bounds.min.z));
+            //     OUTCollisionPoints.Add(new Vector3(bounds.min.x + bounds.size.x, bounds.min.y + bounds.size.y, bounds.min.z + bounds.size.z));
+            //     OUTCollisionPoints.Add(new Vector3(bounds.min.x, bounds.min.y + bounds.size.y, bounds.min.z + bounds.size.z));
+            //     OUTCollisionPoints.Add(new Vector3(bounds.min.x, bounds.min.y, bounds.min.z + bounds.size.z));
+            //     OUTCollisionPoints.Add(new Vector3(bounds.min.x, bounds.min.y + bounds.size.y, bounds.min.z));
+            //     OUTCollisionPoints.Add(new Vector3(bounds.min.x + bounds.size.x, bounds.min.y, bounds.min.z + bounds.size.z));
+            // }
             //else //Default should work for every collider
+            
             {
                 Bounds bounds = col.bounds;
                 float sampleSize = 1f / amountOfSamplesPerMeter;

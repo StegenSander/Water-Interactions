@@ -10,6 +10,7 @@
 #pragma kernel HandleNewWaves
 #pragma kernel HandleSpawnWavesCameraBaked
 #pragma kernel HandleSpawnWavesGridBaked
+#pragma kernel AddNewVelocity
 
 #pragma kernel DiffuseTexture
 #pragma kernel DiffuseTextureNoClamp
@@ -52,7 +53,7 @@ RWTexture2D<float> DensityFieldOUT;
 Texture2D<float4> CameraCollisionMapOld;
 Texture2D<float4> CameraCollisionMapNew;
 
-Texture2D<float4> GridCollisionMap;
+Texture2D<float2> NewVelocityMap;
 
 Texture2D<float4> CollisionTexture;
 
@@ -61,6 +62,7 @@ StructuredBuffer<NewOccupiedWaveCell> NewOccupiedWaveBuffer;
 
 float DeltaTime;
 float DiffuseRate;
+float DiffuseLossPerSecond;
 
 float InitialSpeedScalar;
 float SpeedScalar;
@@ -124,10 +126,16 @@ float CalculateVolume()
 [numthreads(8, 8, 1)]
 void FixVolume(uint3 id : SV_DispatchThreadID)
 {
-    float diff = OldVolume - NewVolume;
+    float diff = max(OldVolume - NewVolume, 0);
     float valuePerCell = diff / (TextureSize * TextureSize);
     
     DensityFieldOUT[id.xy] = DensityFieldIN[id.xy] + valuePerCell;
+}
+
+[numthreads(8, 8, 1)]
+void AddNewVelocity(uint3 id : SV_DispatchThreadID)
+{
+    VelocityFieldOUT[id.xy] += float4(NewVelocityMap[id.xy], 0, 0) * InitialSpeedScalar;
 }
 
 [numthreads(8, 8, 1)]
@@ -142,11 +150,11 @@ void HandleSpawnWavesCameraBaked(uint3 id : SV_DispatchThreadID)
 [numthreads(8, 8, 1)]
 void HandleSpawnWavesGridBaked(uint3 id : SV_DispatchThreadID)
 {
-    float diff = GridCollisionMap[id.xy].x;
-    diff = diff * 2 - 1;
+    //float diff = GridCollisionMap[id.xy].x;
+    //diff = diff * 2 - 1;
     
-    if (abs(diff) > 0.1f)
-        SpawnWaveOnCell(id.xy, diff);
+    //if (abs(diff) > 0.1f)
+    //    SpawnWaveOnCell(id.xy, diff);
 }
 
 [numthreads(1, 1, 1)]
@@ -191,7 +199,8 @@ void DiffuseTexture(uint3 id : SV_DispatchThreadID)
     const int2 OFFSETUP = int2(0, 1);
     const int2 OFFSETDOWN = int2(0, -1);
     
-    float scalar = DiffuseRate * DeltaTime * TextureSize * TextureSize;
+    float diffuseLossScalar = clamp(1 - DiffuseLossPerSecond * DeltaTime, 0, 1);
+    float scalar = DiffuseRate * DeltaTime * TextureSize * TextureSize ;
     
     float4 gainThisFrame
     = scalar
@@ -200,7 +209,7 @@ void DiffuseTexture(uint3 id : SV_DispatchThreadID)
     + DiffuseTextureIN[GetClampedCoord(id.xy + OFFSETUP)]
     + DiffuseTextureIN[GetClampedCoord(id.xy + OFFSETDOWN)]);
     
-    DiffuseTextureOUT[id.xy] = (DiffuseTextureIN[id.xy] + gainThisFrame) / (1 + 4 * scalar);
+    DiffuseTextureOUT[id.xy] = (DiffuseTextureIN[id.xy] + gainThisFrame) / (1 + 4 * scalar) * diffuseLossScalar;
 }
 
 [numthreads(8, 8, 1)]
@@ -211,6 +220,7 @@ void DiffuseTextureNoClamp(uint3 id : SV_DispatchThreadID)
     const int2 OFFSETUP = int2(0, 1);
     const int2 OFFSETDOWN = int2(0, -1);
     
+    float diffuseLossScalar = clamp(1 - DiffuseLossPerSecond * DeltaTime, 0, 1);
     float scalar = DiffuseRate * DeltaTime * TextureSize * TextureSize;
     
     float4 gainThisFrame
@@ -220,7 +230,7 @@ void DiffuseTextureNoClamp(uint3 id : SV_DispatchThreadID)
     + DiffuseTextureIN[id.xy + OFFSETUP]
     + DiffuseTextureIN[id.xy + OFFSETDOWN]);
     
-    DiffuseTextureOUT[id.xy] = (DiffuseTextureIN[id.xy] + gainThisFrame) / (1 + 4 * scalar);
+    DiffuseTextureOUT[id.xy] = (DiffuseTextureIN[id.xy] + gainThisFrame) / (1 + 4 * scalar) * diffuseLossScalar;
 }
 
 [numthreads(8, 8, 1)]

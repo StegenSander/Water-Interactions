@@ -33,8 +33,8 @@ namespace WaterInteraction
                 Vector2Int texPos = WorldPosToTexturePos(position, SceneData.Instance.SimData.TextureSize);
                 Color c =_HeightMap.GetPixel(texPos.x, texPos.y);
 
-                float heightMapValue = (c.b - 0.5f) * 2;
-                float height = transform.position.y + _SurfaceHeight + heightMapValue * SceneData.Instance.SimData.HeightScalar;
+                float heightMapValue = (c.b - 0.5f) * SceneData.Instance.SimData.HeightScalar;
+                float height = transform.position.y + _SurfaceHeight + heightMapValue ;
                 offset = height - position.y;
                 return height > position.y;
             }

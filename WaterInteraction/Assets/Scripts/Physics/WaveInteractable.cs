@@ -34,7 +34,7 @@ namespace WaterInteraction
             _Volume = VolumeCalcManager.Instance.GetVolume(meshFilter.mesh, transform.localScale);
 
             List<Vector3> points = new List<Vector3>();
-            PhysicsHelpers.CalculateWaterCollisionPoints(10, _MinDistanceBetweenCollisionPoints, _Collider, ref points);
+            PhysicsHelpers.CalculateWaterCollisionPoints(_CollisionSamplesPerMeter, _MinDistanceBetweenCollisionPoints, _Collider, ref points);
             _AmountOfCollisionPoints = Mathf.Max(points.Count, 1);
             _CollisionPoints = new List<Transform>(_AmountOfCollisionPoints);
 
@@ -66,11 +66,11 @@ namespace WaterInteraction
             if (!_CurrentWaterForceHandler) return;
 
             Profiler.BeginSample("ApplyingForceToObject");
+            float volumePerc = 1f / _AmountOfCollisionPoints;
             foreach (Transform t in _CollisionPoints)
             {
                 if (_CurrentWaterForceHandler.GetPosToSurfaceOffset(t.position, out float offset))
                 {
-                    float volumePerc = 1f / _AmountOfCollisionPoints;
                     Vector3 force = Vector3.up * PhysicsHelpers.CalculateFluidForce(_Volume* volumePerc);
                     _Rigidbody.AddForceAtPosition(force, t.position, ForceMode.Force);
                 }

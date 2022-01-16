@@ -27,7 +27,7 @@ public class ThrowObject : MonoBehaviour
     {
         if (!_ObjectToThrow) return;
 
-        GameObject obj = Instantiate(_ObjectToThrow, Camera.main.transform.position, Quaternion.identity, _BallParent.transform);
+        GameObject obj = Instantiate(_ObjectToThrow, Camera.main.transform.position, _ObjectToThrow.transform.rotation, _BallParent.transform);
 
         Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
 

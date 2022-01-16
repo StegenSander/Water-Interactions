@@ -23,13 +23,18 @@ namespace WaterInteraction
         #region SerializeFields
         [SerializeField] ComputeShader _NavierStokesShader;
         [SerializeField] Material _TargetMaterial;
+        [SerializeField] Material _DebugMat;
         [SerializeField] Texture2D _CollisionTexture;
 
         [Header("UpdateValues")]
         [SerializeField] float _InitialSpeedScalar;
         [SerializeField] float _DensityDiffuseRate;
+        [SerializeField] float _DensityDiffuseLossScalar = 0f;
         [SerializeField] float _VelocityDiffuseRate;
+        [SerializeField] float _VelocityDiffuseLossScalar = 0f;
         [SerializeField] float _SpeedUpdateScalar;
+        [SerializeField] float _TimeBetweenVolumeFix = 1f;
+        float _VolumeFixTimer = 0f;
 
         [Header("DebugOptions")]
         [SerializeField] bool _DiffuseTextures = true;
@@ -50,6 +55,7 @@ namespace WaterInteraction
         int _KernelHandleSpawnWavesCameraBaked;
         int _KernelHandleSpawnWavesGridBaked;
         int _KernelHandleNewWaves;
+        int _KernelAddNewVelocity;
 
         int _KernelDiffuseTexture;
         int _KernelDiffuseTextureNoClamp;
@@ -76,10 +82,16 @@ namespace WaterInteraction
             set { _CameraCollisionMapNew = value; }
         }
 
-        RenderTexture _GridCollisionMap;
-        public RenderTexture GridCollisionMap
+        bool _AppliedNewVelocity;
+        RenderTexture _NewVelocityMap;
+        public RenderTexture NewVelocityMap
         {
-            set { _GridCollisionMap = value; }
+            set {
+                _AppliedNewVelocity = false;
+                _NewVelocityMap = value;
+
+                if (_DebugMat) _DebugMat.SetTexture("_BaseMap", _NewVelocityMap);
+            }
         }
 
         float _TargetVolume;
@@ -102,6 +114,7 @@ namespace WaterInteraction
         //Double buffer system;
         bool _IsTexture1Input = true;
 
+
         #region MonoBehaviourFunctions
         // Start is called before the first frame update
         void Start()
@@ -112,6 +125,7 @@ namespace WaterInteraction
             _TargetMaterial.SetTexture("_BaseMap", _TargetTexture);
             _TargetMaterial.SetTexture("_InputMap", _TargetTexture);
             _TargetMaterial.SetFloat("_WaveHeightMultiplier", SceneData.Instance.SimData.HeightScalar);
+            if(_DebugMat) _DebugMat.SetTexture("_BaseMap", _TargetTexture);
             Debug.Log("Start finished");
 
 
@@ -127,21 +141,24 @@ namespace WaterInteraction
 
         void Update()
         {
-            HandleNewClickWaves();
 
-            if (SceneData.Instance.SimData.CollisionBaker == SimulationData.CollisionBakers.CameraBake)
-                HandleNewCollisionWavesCameraBaked();
-            else if (SceneData.Instance.SimData.CollisionBaker == SimulationData.CollisionBakers.GridBake)
-                HandleNewCollisionWavesGridBaked();
+            //New Waves
+            //HandleNewClickWaves();
+            //if (SceneData.Instance.SimData.CollisionBaker == SimulationData.CollisionBakers.CameraBake)
+            //    HandleNewCollisionWavesCameraBaked();
+            //else if (SceneData.Instance.SimData.CollisionBaker == SimulationData.CollisionBakers.GridBake)
+            //    HandleNewCollisionWavesGridBaked();
 
+            AddNewVelocity();
+
+            //Diffuse
             if (_DiffuseTextures) DiffuseTextures();
 
-
+            //Velocity
             if (_UpdateAlongVelocityField) UpdateAlongVelocityField();
 
-            _NewVolume = CalculateTotalVolume();
-            FixVolume();
-            SwapBuffer();
+            //Fix Volume
+            UpdateFixVolume();
 
             //HandleCollision();
             RenderHeightMap();
@@ -163,6 +180,8 @@ namespace WaterInteraction
             _KernelHandleSpawnWavesCameraBaked = _NavierStokesShader.FindKernel("HandleSpawnWavesCameraBaked");
             _KernelHandleSpawnWavesGridBaked = _NavierStokesShader.FindKernel("HandleSpawnWavesGridBaked");
             _KernelHandleNewWaves = _NavierStokesShader.FindKernel("HandleNewWaves");
+            _KernelAddNewVelocity = _NavierStokesShader.FindKernel("AddNewVelocity");
+
             _KernelDiffuseTexture = _NavierStokesShader.FindKernel("DiffuseTexture");
             _KernelDiffuseTextureNoClamp = _NavierStokesShader.FindKernel("DiffuseTextureNoClamp");
             _KernelHandleCollision = _NavierStokesShader.FindKernel("HandleCollision");
@@ -306,6 +325,19 @@ namespace WaterInteraction
 
             _NavierStokesShader.Dispatch(_KernelCalculateNewVolume, 1, 1, 1);
         }
+        void UpdateFixVolume()
+        {
+            //Fix Volume
+            _VolumeFixTimer += Time.deltaTime;
+            if (_VolumeFixTimer > _TimeBetweenVolumeFix)
+            {
+                _NewVolume = CalculateTotalVolume();
+                FixVolume();
+                SwapBuffer();
+                _VolumeFixTimer = 0f;
+            }
+        }
+
         void FixVolume()
         {
             if (_IsTexture1Input)
@@ -321,6 +353,8 @@ namespace WaterInteraction
 
             _NavierStokesShader.SetFloat( "OldVolume", _TargetVolume);
             _NavierStokesShader.SetFloat( "NewVolume", _NewVolume);
+            Debug.Log(_TargetVolume - _NewVolume);
+            _NavierStokesShader.SetInt("TextureSize", SceneData.Instance.SimData.TextureSize);
             _NavierStokesShader.Dispatch(_KernelFixVolume, SceneData.Instance.SimData.TextureSize / 8, SceneData.Instance.SimData.TextureSize / 8, 1);
         }
         #endregion
@@ -370,20 +404,40 @@ namespace WaterInteraction
 
         void HandleNewCollisionWavesGridBaked()
         {
+            //if (_IsTexture1Input)
+            //{
+            //    _NavierStokesShader.SetTexture(_KernelHandleSpawnWavesGridBaked, "VelocityFieldOUT", _VelocityField1);
+            //}
+            //else
+            //{
+            //    _NavierStokesShader.SetTexture(_KernelHandleSpawnWavesGridBaked, "VelocityFieldOUT", _VelocityField2);
+            //}
+
+            //_NavierStokesShader.SetTexture(_KernelHandleSpawnWavesGridBaked, "GridCollisionMap", _GridCollisionMap);
+            //_NavierStokesShader.SetInt("TextureSize", SceneData.Instance.SimData.TextureSize);
+            //_NavierStokesShader.SetFloat("InitialSpeedScalar", _InitialSpeedScalar);
+            //_NavierStokesShader.Dispatch(_KernelHandleSpawnWavesGridBaked, SceneData.Instance.SimData.TextureSize / 8, SceneData.Instance.SimData.TextureSize / 8, 1);
+            ////Debug.Log("Waves added");
+        }
+
+        void AddNewVelocity()
+        {
+            if (_AppliedNewVelocity) return;
+
             if (_IsTexture1Input)
             {
-                _NavierStokesShader.SetTexture(_KernelHandleSpawnWavesGridBaked, "VelocityFieldOUT", _VelocityField1);
+                _NavierStokesShader.SetTexture(_KernelAddNewVelocity, "VelocityFieldOUT", _VelocityField1);
             }
             else
             {
-                _NavierStokesShader.SetTexture(_KernelHandleSpawnWavesGridBaked, "VelocityFieldOUT", _VelocityField2);
+                _NavierStokesShader.SetTexture(_KernelAddNewVelocity, "VelocityFieldOUT", _VelocityField2);
             }
 
-            _NavierStokesShader.SetTexture(_KernelHandleSpawnWavesGridBaked, "GridCollisionMap", _GridCollisionMap);
-            _NavierStokesShader.SetInt("TextureSize", SceneData.Instance.SimData.TextureSize);
+            _NavierStokesShader.SetTexture(_KernelAddNewVelocity, "NewVelocityMap", _NewVelocityMap);
             _NavierStokesShader.SetFloat("InitialSpeedScalar", _InitialSpeedScalar);
-            _NavierStokesShader.Dispatch(_KernelHandleSpawnWavesGridBaked, SceneData.Instance.SimData.TextureSize / 8, SceneData.Instance.SimData.TextureSize / 8, 1);
-            //Debug.Log("Waves added");
+
+            _NavierStokesShader.Dispatch(_KernelAddNewVelocity, SceneData.Instance.SimData.TextureSize / 8, SceneData.Instance.SimData.TextureSize / 8, 1);
+            _AppliedNewVelocity = true;
         }
         #endregion
 
@@ -392,7 +446,6 @@ namespace WaterInteraction
         {
             DiffuseDensity();
             DiffuseVelocity();
-
             SwapBuffer();
         }
 
@@ -400,11 +453,11 @@ namespace WaterInteraction
         {
             if (_IsTexture1Input)
             {
-                DiffuseTexture(_DensityField1, _DensityField2, _DensityDiffuseRate, SceneData.Instance.SimData.TextureSize);
+                DiffuseTexture(_DensityField1, _DensityField2, _DensityDiffuseRate, SceneData.Instance.SimData.TextureSize, _DensityDiffuseLossScalar);
             }
             else
             {
-                DiffuseTexture(_DensityField2, _DensityField1, _DensityDiffuseRate, SceneData.Instance.SimData.TextureSize);
+                DiffuseTexture(_DensityField2, _DensityField1, _DensityDiffuseRate, SceneData.Instance.SimData.TextureSize, _DensityDiffuseLossScalar);
             }
         }
 
@@ -412,31 +465,33 @@ namespace WaterInteraction
         {
             if (_IsTexture1Input)
             {
-                DiffuseTextureNoClamp(_VelocityField1, _VelocityField2, _VelocityDiffuseRate, SceneData.Instance.SimData.TextureSize);
+                DiffuseTextureNoClamp(_VelocityField1, _VelocityField2, _VelocityDiffuseRate, SceneData.Instance.SimData.TextureSize, _VelocityDiffuseLossScalar);
             }
             else
             {
-                DiffuseTextureNoClamp(_VelocityField2, _VelocityField1, _VelocityDiffuseRate, SceneData.Instance.SimData.TextureSize);
+                DiffuseTextureNoClamp(_VelocityField2, _VelocityField1, _VelocityDiffuseRate, SceneData.Instance.SimData.TextureSize, _VelocityDiffuseLossScalar);
             }
         }
 
-        public void DiffuseTexture(RenderTexture textureIn, RenderTexture textureOut, float diffuseRate, int textureSize)
+        public void DiffuseTexture(RenderTexture textureIn, RenderTexture textureOut, float diffuseRate, int textureSize, float diffuseLossScalar)
         {
             _NavierStokesShader.SetTexture(_KernelDiffuseTexture, "DiffuseTextureIN", textureIn);
             _NavierStokesShader.SetTexture(_KernelDiffuseTexture, "DiffuseTextureOUT", textureOut);
 
             _NavierStokesShader.SetFloat("DiffuseRate", diffuseRate);
             _NavierStokesShader.SetFloat("DeltaTime", Time.deltaTime);
+            _NavierStokesShader.SetFloat("DiffuseLossPerSecond", diffuseLossScalar);
             _NavierStokesShader.Dispatch(_KernelDiffuseTexture, textureSize / 8, textureSize / 8, 1);
 
         }
-        public void DiffuseTextureNoClamp(RenderTexture textureIn, RenderTexture textureOut, float diffuseRate, int textureSize)
+        public void DiffuseTextureNoClamp(RenderTexture textureIn, RenderTexture textureOut, float diffuseRate, int textureSize, float diffuseLossScalar)
         {
             _NavierStokesShader.SetTexture(_KernelDiffuseTextureNoClamp, "DiffuseTextureIN", textureIn);
             _NavierStokesShader.SetTexture(_KernelDiffuseTextureNoClamp, "DiffuseTextureOUT", textureOut);
 
             _NavierStokesShader.SetFloat("DiffuseRate", diffuseRate);
             _NavierStokesShader.SetFloat("DeltaTime", Time.deltaTime);
+            _NavierStokesShader.SetFloat("DiffuseLossPerSecond", diffuseLossScalar);
             _NavierStokesShader.Dispatch(_KernelDiffuseTextureNoClamp, textureSize / 8, textureSize / 8, 1);
 
         }
@@ -446,7 +501,6 @@ namespace WaterInteraction
         void UpdateAlongVelocityField()
         {
             UpdateDensityAlongVelocityField();
-
             UpdateVelocityAlongVelocityField();
             SwapBuffer();
         }
