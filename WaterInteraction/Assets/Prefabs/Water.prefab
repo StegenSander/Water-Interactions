@@ -639,7 +639,7 @@ MonoBehaviour:
   _DebugMat2: {fileID: 2100000, guid: 0c198ca8f33b15948a19b5ae1b43f5ca, type: 2}
   _CollisionBakerShader: {fileID: 7200000, guid: 557b91f3be0704e4c9c26372fb5db964, type: 3}
   _AmountOfGridCells: {x: 32, y: 10, z: 32}
-  _MaxSpeed: 10
+  _WaveStrengthScalar: 0.025
   _DrawGrid: 1
 --- !u!65 &2803971663982293704
 BoxCollider:
@@ -856,7 +856,7 @@ MeshFilter:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 8027220703095599935}
-  m_Mesh: {fileID: 5060444177187149915, guid: 3fe10254a4cf7f142a0905c3aca82276, type: 3}
+  m_Mesh: {fileID: -2232952877369940510, guid: 9a1c65790f38d9544ba910fec862804f, type: 3}
 --- !u!23 &8387557121276973802
 MeshRenderer:
   m_ObjectHideFlags: 0

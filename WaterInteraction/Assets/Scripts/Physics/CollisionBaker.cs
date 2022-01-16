@@ -13,7 +13,7 @@ namespace WaterInteraction
         [Header("Core Values")]
         [SerializeField] ComputeShader _CollisionBakerShader;
         [SerializeField] Vector3Int _AmountOfGridCells;
-        [SerializeField] float _MaxSpeed;
+        [SerializeField] float _WaveStrengthScalar;
 
         [Header("Debug Values")]
         [SerializeField] bool _DrawGrid =true;
@@ -188,8 +188,7 @@ namespace WaterInteraction
 
         public void AddColliderToGrid(Collider col, ref float[,,] grid)
         {
-            float vel = col.attachedRigidbody.velocity.magnitude;
-            vel /= _MaxSpeed;
+            float vel = col.attachedRigidbody.velocity.magnitude * col.attachedRigidbody.mass * _WaveStrengthScalar;
             Mathf.Min(vel, 1f);
 
             Bounds bounds = col.bounds;

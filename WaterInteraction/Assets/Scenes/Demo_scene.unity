@@ -266,6 +266,10 @@ PrefabInstance:
       propertyPath: _TimerMin
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 6512795775809673818, guid: d0be0923d111e804e85bb1e48e461e89, type: 3}
+      propertyPath: _InitialSpeedScalar
+      value: 0.25
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: d0be0923d111e804e85bb1e48e461e89, type: 3}
 --- !u!1001 &7534764632619986851

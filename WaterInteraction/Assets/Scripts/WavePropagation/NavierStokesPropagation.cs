@@ -234,6 +234,7 @@ namespace WaterInteraction
             texture.name = "TargetTexture (Generated)";
             texture.wrapMode = TextureWrapMode.Repeat;
             texture.enableRandomWrite = true;
+            texture.filterMode = FilterMode.Trilinear;
             texture.Create();
         }
 

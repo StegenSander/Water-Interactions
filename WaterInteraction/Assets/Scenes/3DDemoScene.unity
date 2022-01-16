@@ -687,6 +687,12 @@ PrefabInstance:
   m_Modification:
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 6512795774590143674, guid: d0be0923d111e804e85bb1e48e461e89, type: 3}
+      propertyPath: m_text
+      value: 'Cube
+
+'
+      objectReference: {fileID: 0}
     - target: {fileID: 6512795774961902073, guid: d0be0923d111e804e85bb1e48e461e89, type: 3}
       propertyPath: m_Name
       value: WaterWorld
