@@ -179,4 +179,4 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   _ObjectToThrow: {fileID: 7216293474318309866, guid: d12446753c3bb8d43ad2180ef54bbdf1, type: 3}
-  _ThrowForce: 40
+  _ThrowForce: 20

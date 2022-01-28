@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Profiling;
 
 namespace WaterInteraction
 {
@@ -82,7 +83,7 @@ namespace WaterInteraction
             set { _CameraCollisionMapNew = value; }
         }
 
-        bool _AppliedNewVelocity;
+        bool _AppliedNewVelocity = true;
         RenderTexture _NewVelocityMap;
         public RenderTexture NewVelocityMap
         {
@@ -354,7 +355,6 @@ namespace WaterInteraction
 
             _NavierStokesShader.SetFloat( "OldVolume", _TargetVolume);
             _NavierStokesShader.SetFloat( "NewVolume", _NewVolume);
-            Debug.Log(_TargetVolume - _NewVolume);
             _NavierStokesShader.SetInt("TextureSize", SceneData.Instance.SimData.TextureSize);
             _NavierStokesShader.Dispatch(_KernelFixVolume, SceneData.Instance.SimData.TextureSize / 8, SceneData.Instance.SimData.TextureSize / 8, 1);
         }
@@ -424,6 +424,7 @@ namespace WaterInteraction
         void AddNewVelocity()
         {
             if (_AppliedNewVelocity) return;
+            ProfilerDataCollector.NewVelocitiesSampler.Begin();
 
             if (_IsTexture1Input)
             {
@@ -439,15 +440,20 @@ namespace WaterInteraction
 
             _NavierStokesShader.Dispatch(_KernelAddNewVelocity, SceneData.Instance.SimData.TextureSize / 8, SceneData.Instance.SimData.TextureSize / 8, 1);
             _AppliedNewVelocity = true;
+
+
+            ProfilerDataCollector.NewVelocitiesSampler.End();
         }
         #endregion
 
         #region DiffuseWaves
         void DiffuseTextures()
         {
+            ProfilerDataCollector.DiffuseTextureSampler.Begin();
             DiffuseDensity();
             DiffuseVelocity();
             SwapBuffer();
+            ProfilerDataCollector.DiffuseTextureSampler.End();
         }
 
         void DiffuseDensity()
@@ -501,9 +507,11 @@ namespace WaterInteraction
         #region UpdateAlongVelocityField
         void UpdateAlongVelocityField()
         {
+            ProfilerDataCollector.UpdateVelSampler.Begin();
             UpdateDensityAlongVelocityField();
             UpdateVelocityAlongVelocityField();
             SwapBuffer();
+            ProfilerDataCollector.UpdateVelSampler.End();
         }
 
         void UpdateDensityAlongVelocityField()

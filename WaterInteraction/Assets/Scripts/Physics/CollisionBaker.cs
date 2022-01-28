@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Profiling;
 
 namespace WaterInteraction
 {
@@ -127,11 +128,11 @@ namespace WaterInteraction
             {
                 if (_Is1NewCollisionGrid)
                 {
-                    DrawGrid(_CollisionGrid1);
+                    DrawGrid(_CollisionGrid2);
                 }
                 else
                 {
-                    DrawGrid(_CollisionGrid2);
+                    DrawGrid(_CollisionGrid1);
                 }
             }
         }
@@ -188,6 +189,7 @@ namespace WaterInteraction
 
         public void AddColliderToGrid(Collider col, ref float[,,] grid)
         {
+            ProfilerDataCollector.AddingCollidersSampler.Begin();
             float vel = col.attachedRigidbody.velocity.magnitude * col.attachedRigidbody.mass * _WaveStrengthScalar;
             Mathf.Min(vel, 1f);
 
@@ -198,8 +200,6 @@ namespace WaterInteraction
 
             Bounds overlappingBounds = new Bounds();
             overlappingBounds.SetMinMax(min, max);
-
-            WaveInteractable waveInteractable = col.gameObject.GetComponent<WaveInteractable>();
 
             for (float x = overlappingBounds.min.x; x < overlappingBounds.max.x; x += _GridCellSize.x)
             {
@@ -216,6 +216,7 @@ namespace WaterInteraction
                     }
                 }
             }
+            ProfilerDataCollector.AddingCollidersSampler.End();
         }
 
         private void HandleCollisionInPoint(WaveInteractable waveInteractable, Vector3 worldPos)
@@ -226,6 +227,7 @@ namespace WaterInteraction
 
         public void BakeCollision()
         {
+            ProfilerDataCollector.CollisionBakeSampler.Begin();
             int textureSize = SceneData.Instance.SimData.TextureSize;
             if (_Is1NewCollisionGrid)
             {
@@ -250,19 +252,25 @@ namespace WaterInteraction
             _CollisionBakerShader.SetFloat("DefaultGridHeight", SceneData.Instance.SimData.DefaultDensityValue);
             _CollisionBakerShader.SetInt("TextureSize", textureSize);
             _CollisionBakerShader.Dispatch(_KernelBakeCollisionMap, textureSize / 8, textureSize / 8, 1);
+
+            ProfilerDataCollector.CollisionBakeSampler.End();
         }
         public void BakeVelocityMap()
         {
+            ProfilerDataCollector.NewVelocitiesSampler.Begin();
             _CollisionBakerShader.SetTexture(_KernelBakeVelocityMap, "CollisionMap", _CollisionTexture);
             _CollisionBakerShader.SetTexture(_KernelBakeVelocityMap, "VelocityMap", _VelocityTexture);
 
             int textureSize = SceneData.Instance.SimData.TextureSize;
             _CollisionBakerShader.SetInt("TextureSize", textureSize);
             _CollisionBakerShader.Dispatch(_KernelBakeVelocityMap, textureSize / 8, textureSize / 8, 1);
+
+            ProfilerDataCollector.NewVelocitiesSampler.End();
         }
 
         public void ClearGrid(ref float[,,] grid)
         {
+            Profiler.BeginSample("ClearGrid");
             for (int x = 0; x < _AmountOfGridCells.x +1; x++)
             {
                 for (int y = 0; y < _AmountOfGridCells.y +1; y++)
@@ -273,6 +281,7 @@ namespace WaterInteraction
                     }
                 }
             }
+            Profiler.EndSample();
         }
 
         #region MathHelpers

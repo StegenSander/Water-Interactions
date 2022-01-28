@@ -41,7 +41,9 @@ namespace WaterInteraction
                 Vector2 normalizedTargetPosition = (worldOffset / worldTargetSize);
                 Debug.Log("normalizedTargetPosition: " + normalizedTargetPosition);
 
-                SceneData.Instance.WavePropagation.SpawnWave(normalizedTargetPosition);
+                FindObjectOfType<WavePropagation>().SpawnWave(normalizedTargetPosition);
+
+                //SceneData.Instance.WavePropagation.SpawnWave(normalizedTargetPosition);
             }
         }
     }

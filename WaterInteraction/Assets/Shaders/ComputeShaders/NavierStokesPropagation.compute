@@ -237,7 +237,7 @@ void DiffuseTextureNoClamp(uint3 id : SV_DispatchThreadID)
 void UpdateDensityAlongVelocityField(uint3 id : SV_DispatchThreadID)
 {
     float outDen = (float) 0;
-    const int range = 5;
+    const int range = 20;
     
     for (int x = -range; x <= range; x++)
     {
@@ -267,7 +267,7 @@ void UpdateDensityAlongVelocityField(uint3 id : SV_DispatchThreadID)
 void UpdateVelocityAlongVelocityField(uint3 id : SV_DispatchThreadID)
 {
     float2 outVel = (float2)0;
-    const int range = 5;
+    const int range = 20;
     
     for (int x = -range; x <= range; x++)
     {
@@ -275,7 +275,7 @@ void UpdateVelocityAlongVelocityField(uint3 id : SV_DispatchThreadID)
         {
             int2 coord = int2(id.x + x, id.y + y);
             
-            if (coord.x >= 0 && coord.x < TextureSize && coord.y >= 0 && coord.y <TextureSize)
+            if (coord.x >= 0 && coord.x < TextureSize && coord.y >= 0 && coord.y < TextureSize)
             {
                 float2 vel = VelocityFieldIN[coord].xy;
             

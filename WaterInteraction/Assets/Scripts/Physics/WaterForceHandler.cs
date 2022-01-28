@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Profiling;
 
 namespace WaterInteraction
 {
@@ -21,8 +22,10 @@ namespace WaterInteraction
         // Update is called once per frame
         void Update()
         {
+            ProfilerDataCollector.ConvertSampler.Begin();
             _LastHeightMap = SceneData.Instance.WavePropagation.HeightMap;
             RenderHelpers.ToTexture2DNoAlloc(_LastHeightMap, ref _HeightMap);
+            ProfilerDataCollector.ConvertSampler.End();
         }
 
         public bool GetPosToSurfaceOffset(Vector3 position, out float offset)

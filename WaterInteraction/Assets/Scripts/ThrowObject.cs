@@ -31,7 +31,7 @@ public class ThrowObject : MonoBehaviour
 
         Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
 
-        obj.GetComponent<Rigidbody>().AddForce(ray.direction * _ThrowForce, ForceMode.Impulse);
+        obj.GetComponent<Rigidbody>().AddForce(ray.direction * _ThrowForce, ForceMode.VelocityChange);
     }
 
     public void SetObjectToThrow(GameObject obj)

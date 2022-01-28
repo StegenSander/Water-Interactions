@@ -34,12 +34,26 @@ namespace WaterInteraction
             int[] triangles = mesh.triangles;
             for (int i = 0; i < triangles.Length; i += 3)
             {
-                float tempVolume = CalculateVolumeOfTriangle(mesh.vertices[triangles[i]], mesh.vertices[triangles[i + 1]], mesh.vertices[triangles[i + 2]]);
+                float tempVolume = CalculateVolumeOfTriangle(mesh.vertices[triangles[i]]
+                    , mesh.vertices[triangles[i + 1]]
+                    , mesh.vertices[triangles[i + 2]]);
+
                 volume += Mathf.Abs(tempVolume);
             }
 
             return volume;
         }
+        static private float CalculateVolumeOfTriangle(Vector3 vertex1, Vector3 vertex2, Vector3 vertex3)
+        {
+            var v321 = vertex3.x * vertex2.y * vertex1.z;
+            var v231 = vertex2.x * vertex3.y * vertex1.z;
+            var v312 = vertex3.x * vertex1.y * vertex2.z;
+            var v132 = vertex1.x * vertex3.y * vertex2.z;
+            var v213 = vertex2.x * vertex1.y * vertex3.z;
+            var v123 = vertex1.x * vertex2.y * vertex3.z;
+            return (1.0f / 6.0f) * (-v321 + v231 + v312 - v132 - v213 + v123);
+        }
+
         static public float CalculateVolumeOfMesh(Mesh mesh, Vector3 scale)
         {
             float volume = 0f;
@@ -60,46 +74,17 @@ namespace WaterInteraction
 
             return volume;
         }
-        static private float CalculateVolumeOfTriangle(Vector3 vertex1, Vector3 vertex2, Vector3 vertex3)
-        {
-            var v321 = vertex3.x * vertex2.y * vertex1.z;
-            var v231 = vertex2.x * vertex3.y * vertex1.z;
-            var v312 = vertex3.x * vertex1.y * vertex2.z;
-            var v132 = vertex1.x * vertex3.y * vertex2.z;
-            var v213 = vertex2.x * vertex1.y * vertex3.z;
-            var v123 = vertex1.x * vertex2.y * vertex3.z;
-            return (1.0f / 6.0f) * (-v321 + v231 + v312 - v132 - v213 + v123);
-        }
         #endregion
 
         #region CollisionCalculations
         static public void CalculateWaterCollisionPoints(int amountOfSamplesPerMeter,float minDistanceBetweenPoint, Collider col,ref List<Vector3> OUTCollisionPoints)
         {
-            // if (col.GetType() == typeof(BoxCollider)) //Optimasation possible fir every specific collider type
-            // {
-            //     Bounds bounds = col.bounds;
-            //     OUTCollisionPoints.Add(new Vector3(bounds.min.x, bounds.min.y, bounds.min.z));
-            //     OUTCollisionPoints.Add(new Vector3(bounds.min.x + bounds.size.x, bounds.min.y, bounds.min.z));
-            //     OUTCollisionPoints.Add(new Vector3(bounds.min.x + bounds.size.x, bounds.min.y + bounds.size.y, bounds.min.z));
-            //     OUTCollisionPoints.Add(new Vector3(bounds.min.x + bounds.size.x, bounds.min.y + bounds.size.y, bounds.min.z + bounds.size.z));
-            //     OUTCollisionPoints.Add(new Vector3(bounds.min.x, bounds.min.y + bounds.size.y, bounds.min.z + bounds.size.z));
-            //     OUTCollisionPoints.Add(new Vector3(bounds.min.x, bounds.min.y, bounds.min.z + bounds.size.z));
-            //     OUTCollisionPoints.Add(new Vector3(bounds.min.x, bounds.min.y + bounds.size.y, bounds.min.z));
-            //     OUTCollisionPoints.Add(new Vector3(bounds.min.x + bounds.size.x, bounds.min.y, bounds.min.z + bounds.size.z));
-            // }
-            //else //Default should work for every collider
-            
             {
                 Bounds bounds = col.bounds;
                 float sampleSize = 1f / amountOfSamplesPerMeter;
                 Vector3 sampleCount = new Vector3(amountOfSamplesPerMeter * bounds.size.x
                     , amountOfSamplesPerMeter * bounds.size.y
                     , amountOfSamplesPerMeter * bounds.size.z);
-
-                Debug.Log(bounds);
-
-
-                List<Vector3> tempPoints = new List<Vector3>(Mathf.RoundToInt(sampleCount.x * sampleCount.y * sampleCount.z/2));
 
                 for (int x = 0; x < sampleCount.x; x++)
                 {

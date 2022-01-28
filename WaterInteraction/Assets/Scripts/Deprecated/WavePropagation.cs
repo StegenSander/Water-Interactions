@@ -95,7 +95,7 @@ namespace WaterInteraction
         }
         void UpdateWaves()
         {
-            Profiler.BeginSample("UpdatingWaves");
+            //Profiler.BeginSample("UpdatingWaves");
             for (int i =0; i < _Waves.Count; i++)
             {
                 WaveSegment w = _Waves[i];
@@ -103,12 +103,12 @@ namespace WaterInteraction
                 w.Radius += w.Speed * Time.deltaTime;
                 _Waves[i] = w;
             }
-            Profiler.EndSample();
+            //Profiler.EndSample();
         }
 
         void ValidateWaves()
         {
-            Profiler.BeginSample("Validate Waves");
+            //Profiler.BeginSample("Validate Waves");
             foreach (WaveSegment wave in _Waves)
             {
                 if (!IsValidSegment(wave))
@@ -125,7 +125,7 @@ namespace WaterInteraction
             }
             _WavesToDestroy.Clear();
 
-            Profiler.EndSample();
+            //Profiler.EndSample();
         }
 
         bool IsValidSegment(WaveSegment wave)

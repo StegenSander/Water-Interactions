@@ -65,7 +65,7 @@ namespace WaterInteraction
         {
             if (!_CurrentWaterForceHandler) return;
 
-            Profiler.BeginSample("ApplyingForceToObject");
+            ProfilerDataCollector.WaterForceSampler.Begin();
             float volumePerc = 1f / _AmountOfCollisionPoints;
             foreach (Transform t in _CollisionPoints)
             {
@@ -75,7 +75,7 @@ namespace WaterInteraction
                     _Rigidbody.AddForceAtPosition(force, t.position, ForceMode.Force);
                 }
             }
-            Profiler.EndSample();
+            ProfilerDataCollector.WaterForceSampler.End();
         }
 
         private void OnTriggerEnter(Collider other)
